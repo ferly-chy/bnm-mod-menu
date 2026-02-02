@@ -32,7 +32,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
     std::vector<std::string> feats = {
             "Toggle:Currencies",
-            "Toggle:Promote Progress:true",
+            "Toggle:Cards Progress",
             "Seekbar:Reward:1_10",
     };
     return toJobjectArray(env, feats);
@@ -40,7 +40,7 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
 
 struct Feature {
     bool currencies{};
-    bool promote{};
+    bool progress{};
     int reward{};
 };
 
@@ -61,7 +61,7 @@ Java_com_android_support_Menu_valueChange(
             break;
         }
         case 1: {
-            feature.promote = toJboolean(env, value);
+            feature.progress = toJboolean(env, value);
             break;
         }
         case 2: {
@@ -96,8 +96,8 @@ void (*old_Init)(void *instance, int level, int progress);
 
 void new_Init(void *instance, int level, int progress) {
     if (instance != nullptr) {
-        if (feature.promote) {
-            progress = 1000;
+        if (feature.progress) {
+            progress = progress + 100;
         }
     }
     return old_Init(instance, level, progress);
