@@ -97,7 +97,7 @@ float new_GetDefenceRate(void *instance, void *inSource,
 }
 
 
-// Example Game: [Ark Re:Code](https://www.nutaku.net/games/ark-recode/)
+// [Ark Re:Code](https://www.nutaku.net/games/ark-recode/)
 void OnLoaded() {
     LOGI("OnLoaded");
     auto AssemblyCSharp = BNM::Image("Assembly-CSharp");

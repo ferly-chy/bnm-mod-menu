@@ -68,7 +68,7 @@ float new_PlayerMove() {
 }
 
 
-// Example Game: [Mafia Queens](https://www.nutaku.net/games/mafia-queens/)
+// [Mafia Queens](https://www.nutaku.net/games/mafia-queens/)
 void OnLoaded() {
     LOGI("OnLoaded");
     auto AssemblyCSharp = BNM::Image("Assembly-CSharp");

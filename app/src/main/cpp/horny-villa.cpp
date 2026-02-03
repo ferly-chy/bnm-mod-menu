@@ -104,7 +104,7 @@ void new_Init(void *instance, int level, int progress) {
 }
 
 
-// Example Game: [Horny Villa](https://www.nutaku.net/games/horny-villa/)
+// [Horny Villa](https://www.nutaku.net/games/horny-villa/)
 void OnLoaded() {
     LOGI("OnLoaded");
     auto AssemblyCSharp = BNM::Image("Assembly-CSharp");

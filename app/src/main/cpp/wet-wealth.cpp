@@ -119,7 +119,7 @@ void new_Load(void *instance) {
 }
 
 
-// Example Game: [Wet Wealth](https://www.nutaku.net/games/wet-wealth/)
+// [Wet Wealth](https://www.nutaku.net/games/wet-wealth/)
 void OnLoaded() {
     LOGI("OnLoaded");
     auto AssemblyCSharp = BNM::Image("Assembly-CSharp");
