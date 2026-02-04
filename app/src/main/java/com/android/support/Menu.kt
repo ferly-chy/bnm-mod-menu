@@ -45,7 +45,6 @@ const val POS_X = 20
 const val POS_Y = 50
 
 const val MENU_WIDTH = 290
-const val MENU_HEIGHT = 250
 
 val MENU_BG_COLOR = "#EE1C2A35".toColorInt()//#AARRGGBB
 val MENU_FEATURE_BG_COLOR = "#DD141C22".toColorInt() //#AARRGGBB
@@ -98,6 +97,9 @@ class Menu(val context: Activity) {
                 }
 
                 MotionEvent.ACTION_UP -> {
+                    var params = rootFrame.layoutParams as WindowManager.LayoutParams
+                    write("POS_X", params.x)
+                    write("POS_Y", params.y)
                     rootFrame.alpha = 1f
                     if (isClicked) {
                         v.performClick()
@@ -122,8 +124,8 @@ class Menu(val context: Activity) {
         val frameParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            POS_X,  //initialX
-            POS_Y,  //initialY
+            read("POS_X", POS_X),  //initialX
+            read("POS_Y", POS_Y),  //initialY
             WindowManager.LayoutParams.TYPE_APPLICATION,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -304,7 +306,7 @@ class Menu(val context: Activity) {
     @Suppress("UNCHECKED_CAST")
     fun <T> read(key: String, defaultValue: T): T {
         return when (defaultValue) {
-            is String -> sharedPreferences.getString(key, defaultValue) ?: defaultValue
+            is String -> sharedPreferences.getString(key, defaultValue)
             is Int -> sharedPreferences.getInt(key, defaultValue)
             is Boolean -> sharedPreferences.getBoolean(key, defaultValue)
             else -> defaultValue

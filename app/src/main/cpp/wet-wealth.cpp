@@ -74,12 +74,6 @@ Java_com_android_support_Menu_valueChange(
     }
 }
 
-BNM::Class UserCharacterFactory{};
-BNM::Class CharacterStaticUsecase{};
-BNM::Class UserCharactersUsecase{};
-BNM::Class CharacterStatic{};
-BNM::Class List{};
-
 void (*old_AddItem)(void *instance, void *item, int count);
 
 void new_AddItem(void *instance, void *item, int count) {
@@ -94,28 +88,43 @@ void new_AddCharacterTemptation(void *instance, void *character, int added) {
 
 void (*old_Load)(void *instance);
 
-void new_Load(void *instance) {
+void new_Load(BNM::IL2CPP::Il2CppObject *instance) {
     old_Load(instance);
     if (feature.characters) {
-        auto userCharacterFactory = static_cast<BNM::Field<BNM::IL2CPP::Il2CppObject *>>(UserCharactersUsecase.GetField(
-                "userCharacterFactory"))[instance]();
-        auto characterStaticUsecase = static_cast<BNM::Field<BNM::IL2CPP::Il2CppObject *>>(UserCharacterFactory.GetField(
-                "characterStaticUsecase"))[userCharacterFactory]();
-        auto characters = static_cast<BNM::Property<BNM::IL2CPP::Il2CppObject *>>(CharacterStaticUsecase.GetProperty(
-                "Characters"))[characterStaticUsecase]();
-        auto CharactersList = List.GetGeneric(
-                {CharacterStatic});
-        auto count = static_cast<BNM::Property<int>>(CharactersList.GetProperty(
-                "Count"))[characters]();
-        auto getItem = static_cast<BNM::Method<BNM::IL2CPP::Il2CppObject *>>(CharactersList.GetMethod(
-                "get_Item"))[characters];
-        BNM::Method<void> AddCharacterOrExperience = UserCharactersUsecase.GetMethod(
-                "AddCharacterOrExperience")[instance];
-        BNM::Property<int> Id = CharacterStatic.GetProperty("Id");
+        auto userCharacterFactory = GetField<BNM::IL2CPP::Il2CppObject *>(instance,
+                                                                          "userCharacterFactory");
+        auto characterStaticUsecase = GetField<BNM::IL2CPP::Il2CppObject *>(userCharacterFactory,
+                                                                            "characterStaticUsecase");
+        auto characters = GetProperty<BNM::IL2CPP::Il2CppObject *>(characterStaticUsecase,
+                                                                   "Characters");
+
+        auto count = GetProperty<int>(characters, "Count");
+        auto getItem = GetMethod<BNM::IL2CPP::Il2CppObject *>(characters, "get_Item");
+        auto AddCharacterOrExperience = GetMethod<void>(instance,
+                                                        "AddCharacterOrExperience");
         for (int i = 0; i < count; ++i) {
-            AddCharacterOrExperience(Id[getItem(i)](), 100);
+            auto character = getItem(i);
+            int id = GetProperty<int>(character, "Id");
+            AddCharacterOrExperience(id, 100);
         }
     }
+}
+
+
+int (*old_GetLocationCurrentLevel)(void *instance, void *config);
+
+int new_GetLocationCurrentLevel(BNM::IL2CPP::Il2CppObject *instance,
+                                BNM::IL2CPP::Il2CppObject *config) {
+    int level = old_GetLocationCurrentLevel(instance, config);
+    if (level > 5) {
+        auto staticItems = GetProperty<BNM::IL2CPP::Il2CppObject *>(config, "LocationKey");
+        auto userInventoryUsecase = GetField<BNM::IL2CPP::Il2CppObject *>(instance,
+                                                                          "userInventoryUsecase");
+        auto RemoveItem = GetMethod<void>(userInventoryUsecase, "RemoveItem");
+        RemoveItem(staticItems, level - 5);
+        level = 5;
+    }
+    return level;
 }
 
 
@@ -128,20 +137,20 @@ void OnLoaded() {
                                            AssemblyCSharp);
     auto AddItem = UserInventoryUsecase.GetMethod("AddItem");
 
-    UserCharacterFactory = BNM::Class("WetWealth.Characters", "UserCharacterFactory",
-                                      AssemblyCSharp);
-    CharacterStaticUsecase = BNM::Class("WetWealth.Characters", "CharacterStaticUsecase",
-                                        AssemblyCSharp);
-    CharacterStatic = BNM::Class("WetWealth.Characters", "CharacterStatic",
-                                 AssemblyCSharp);
-    UserCharactersUsecase = BNM::Class("WetWealth.Characters", "UserCharactersUsecase",
-                                       AssemblyCSharp);
-    List = BNM::Class("System.Collections.Generic", "List`1", BNM::Image("mscorlib"));
+    auto UserCharactersUsecase = BNM::Class("WetWealth.Characters", "UserCharactersUsecase",
+                                            AssemblyCSharp);
     auto AddCharacterTemptation = UserCharactersUsecase.GetMethod("AddCharacterTemptation");
     auto Load = UserCharactersUsecase.GetMethod("Load");
+
+    auto CityPaidLocationsUsecase = BNM::Class("WetWealth.PaidLocations",
+                                               "CityPaidLocationsUsecase",
+                                               AssemblyCSharp);
+    auto GetLocationCurrentLevel = CityPaidLocationsUsecase.GetMethod("GetLocationCurrentLevel");
 
 
     BNM::BasicHook(AddItem, new_AddItem, old_AddItem);
     BNM::BasicHook(AddCharacterTemptation, new_AddCharacterTemptation, old_AddCharacterTemptation);
     BNM::BasicHook(Load, new_Load, old_Load);
+    BNM::BasicHook(GetLocationCurrentLevel, new_GetLocationCurrentLevel,
+                   old_GetLocationCurrentLevel);
 }
