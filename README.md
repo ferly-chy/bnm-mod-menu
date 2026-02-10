@@ -2,9 +2,9 @@
 
 Floating mod menu for il2cpp base on [ByNameModding](https://github.com/ByNameModding/BNM-Android)
 
-![preview.gif](images/preview.gif)
+Build APK with [apk-build](https://github.com/fourcels/apk-build)
 
-# Build APK with [apk-build](https://github.com/fourcels/apk-build)
+![preview.gif](images/preview.gif)
 
 # Getting Start
 
