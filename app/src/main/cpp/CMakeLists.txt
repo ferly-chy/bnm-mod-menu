@@ -41,7 +41,7 @@ set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Dobby/${CMAKE_ANDROID_ARCH_ABI}/li
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         utils/utils.cpp
-        wet-wealth.cpp
+        passion-industry.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You
@@ -95,6 +95,19 @@ target_link_libraries(${LIB_NAME}
 
 # wet-wealth
 set(LIB_NAME wet-wealth)
+add_library(${LIB_NAME} SHARED
+        utils/utils.cpp
+        ${LIB_NAME}.cpp)
+
+target_link_libraries(${LIB_NAME}
+        # List libraries link to the target library
+        ${LIBDOBBY_PATH}
+        BNM
+        android
+        log)
+
+# passion-industry
+set(LIB_NAME passion-industry)
 add_library(${LIB_NAME} SHARED
         utils/utils.cpp
         ${LIB_NAME}.cpp)
