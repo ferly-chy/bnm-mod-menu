@@ -30,31 +30,36 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Category:CategoryName
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
-    std::vector<std::string> feats = {
+    std::string feats[] = {
             "Seekbar:Attack:1_20",
             "Seekbar:Defence:1_20",
     };
     return toJobjectArray(env, feats);
 }
 
-int attack = 1;
-int defence = 1;
+struct Feature {
+    int attack{1};
+    int defence{1};
+};
+
+Feature feature{};
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_support_Menu_valueChange(
         JNIEnv *env,
         jobject thiz,
         jint featIdx,
         jstring featName,
-        jobject value
+        jint value
 ) {
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            attack = toJint(env, value);
+            feature.attack = value;
             break;
         }
         case 1: {
-            defence = toJint(env, value);
+            feature.defence = value;
             break;
         }
         default:
@@ -64,34 +69,34 @@ Java_com_android_support_Menu_valueChange(
 
 BNM::Field<int> Camp{};
 
-float (*old_GetSkillConditionAttack)(void *instance, void *inSource,
-                                     void *inSkillProcessContext,
-                                     void *inSourceSkillFunctionInfos);
+double (*old_GetSkillConditionAttack)(void *instance, void *inSource,
+                                      void *inSkillProcessContext,
+                                      void *inSourceSkillFunctionInfos);
 
-float new_GetSkillConditionAttack(void *instance, void *inSource,
-                                  void *inSkillProcessContext,
-                                  void *inSourceSkillFunctionInfos) {
+double new_GetSkillConditionAttack(void *instance, void *inSource,
+                                   void *inSkillProcessContext,
+                                   void *inSourceSkillFunctionInfos) {
     auto ret = old_GetSkillConditionAttack(instance, inSource, inSkillProcessContext,
                                            inSourceSkillFunctionInfos);
     auto camp = Camp[inSource]();
     if (camp == 1) {
-        ret = ret * attack;
+        ret = ret * feature.attack;
     }
     return ret;
 }
 
-float (*old_GetDefenceRate)(void *instance, void *inSource,
-                            void *inSkillProcessContext,
-                            void *inSourceSkillFunctionInfos);
+double (*old_GetDefenceRate)(void *instance, void *inSource,
+                             void *inSkillProcessContext,
+                             void *inSourceSkillFunctionInfos);
 
-float new_GetDefenceRate(void *instance, void *inSource,
-                         void *inSkillProcessContext,
-                         void *inSourceSkillFunctionInfos) {
+double new_GetDefenceRate(void *instance, void *inSource,
+                          void *inSkillProcessContext,
+                          void *inSourceSkillFunctionInfos) {
     auto ret = old_GetDefenceRate(instance, inSource, inSkillProcessContext,
                                   inSourceSkillFunctionInfos);
     auto camp = Camp[inSource]();
     if (camp == 2) {
-        ret = ret * defence;
+        ret = ret * feature.defence;
     }
     return ret;
 }

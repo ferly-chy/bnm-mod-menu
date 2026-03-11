@@ -40,7 +40,6 @@ set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Dobby/${CMAKE_ANDROID_ARCH_ABI}/li
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        utils/utils.cpp
         passion-industry.cpp
 )
 
@@ -57,7 +56,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 # horny-villa
 set(LIB_NAME horny-villa)
 add_library(${LIB_NAME} SHARED
-        utils/utils.cpp
         ${LIB_NAME}.cpp)
 
 target_link_libraries(${LIB_NAME}
@@ -70,7 +68,6 @@ target_link_libraries(${LIB_NAME}
 # ark-recode
 set(LIB_NAME ark-recode)
 add_library(${LIB_NAME} SHARED
-        utils/utils.cpp
         ${LIB_NAME}.cpp)
 
 target_link_libraries(${LIB_NAME}
@@ -83,7 +80,6 @@ target_link_libraries(${LIB_NAME}
 # mafia-queens
 set(LIB_NAME mafia-queens)
 add_library(${LIB_NAME} SHARED
-        utils/utils.cpp
         ${LIB_NAME}.cpp)
 
 target_link_libraries(${LIB_NAME}
@@ -96,7 +92,6 @@ target_link_libraries(${LIB_NAME}
 # wet-wealth
 set(LIB_NAME wet-wealth)
 add_library(${LIB_NAME} SHARED
-        utils/utils.cpp
         ${LIB_NAME}.cpp)
 
 target_link_libraries(${LIB_NAME}
@@ -109,7 +104,6 @@ target_link_libraries(${LIB_NAME}
 # passion-industry
 set(LIB_NAME passion-industry)
 add_library(${LIB_NAME} SHARED
-        utils/utils.cpp
         ${LIB_NAME}.cpp)
 
 target_link_libraries(${LIB_NAME}

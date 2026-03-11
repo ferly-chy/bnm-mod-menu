@@ -31,21 +31,19 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Category:CategoryName
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
-    std::vector<std::string> feats = {
+    std::string feats[] = {
             "Toggle:Characters",
             "Seekbar:Reward:1_20",
-            "Seekbar:Temptation:1_20",
     };
     return toJobjectArray(env, feats);
 }
 
 struct Feature {
-    bool characters{};
-    int reward{};
-    int temptation{};
+    bool characters{false};
+    int reward{1};
 };
 
-Feature feature{false, 1, 1};
+Feature feature{};
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_support_Menu_valueChange(
@@ -53,20 +51,16 @@ Java_com_android_support_Menu_valueChange(
         jobject thiz,
         jint featIdx,
         jstring featName,
-        jobject value
+        jint value
 ) {
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            feature.characters = toJboolean(env, value);
+            feature.characters = value;
             break;
         }
         case 1: {
-            feature.reward = toJint(env, value);
-            break;
-        }
-        case 2: {
-            feature.temptation = toJint(env, value);
+            feature.reward = value;
             break;
         }
         default:
@@ -83,7 +77,7 @@ void new_AddItem(void *instance, void *item, int count) {
 void (*old_AddCharacterTemptation)(void *instance, void *character, int added);
 
 void new_AddCharacterTemptation(void *instance, void *character, int added) {
-    return old_AddCharacterTemptation(instance, character, added * feature.temptation);
+    return old_AddCharacterTemptation(instance, character, added * feature.reward);
 }
 
 void (*old_Load)(void *instance);

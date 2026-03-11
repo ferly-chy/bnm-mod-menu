@@ -31,21 +31,21 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Category:CategoryName
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
-    std::vector<std::string> feats = {
-            "Toggle:Collections",
-            "Toggle:Relationship",
+    std::string feats[] = {
+            "Toggle:Contacts",
+            "Toggle:Currencies",
             "Seekbar:Reward:1_20"
     };
     return toJobjectArray(env, feats);
 }
 
 struct Feature {
-    bool collections{};
-    bool relationship{};
-    int reward{};
+    bool contacts{false};
+    bool currencies{false};
+    int reward{1};
 };
 
-Feature feature{false, false, 1};
+Feature feature{};
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_support_Menu_valueChange(
@@ -53,16 +53,20 @@ Java_com_android_support_Menu_valueChange(
         jobject thiz,
         jint featIdx,
         jstring featName,
-        jobject value
+        jint value
 ) {
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            feature.collections = toJboolean(env, value);
+            feature.contacts = value;
             break;
         }
         case 1: {
-            feature.reward = toJint(env, value);
+            feature.currencies = value;
+            break;
+        }
+        case 2: {
+            feature.reward = value;
             break;
         }
         default:
@@ -70,19 +74,46 @@ Java_com_android_support_Menu_valueChange(
     }
 }
 
-void (*old_AddResource)(void *instance, void *resourceType, int amount, void *reason,
-                        void *rewardSource);
+void (*old_AddResource)(void *instance, int resourceType, int amount, int reason,
+                        int rewardSource);
 
-void new_AddResource(void *instance, void *resourceType, int amount, void *reason,
-                     void *rewardSource) {
+void new_AddResource(void *instance, int resourceType, int amount, int reason,
+                     int rewardSource) {
     return old_AddResource(instance, resourceType, amount * feature.reward, reason, rewardSource);
 }
 
-void (*old_GiveGift)(BNM::IL2CPP::Il2CppObject *instance, void *gift);
+bool (*old_TrySubtractResource)(void *instance, int resourceType, int amount, int reason,
+                                void *reasonDetails);
 
-void new_GiveGift(BNM::IL2CPP::Il2CppObject *instance, void *gift) {
-    auto GiveGift = GetMethod<BNM::IL2CPP::Il2CppObject *>(instance, "GiveGift", {"expAmount"});
+bool new_TrySubtractResource(void *instance, int resourceType, int amount, int reason,
+                             void *reasonDetails) {
+    if (feature.currencies) {
+        return true;
+    }
+
+    return old_TrySubtractResource(instance, resourceType, amount, reason,
+                                   reasonDetails);
+}
+
+void (*old_GiveGift)(void *instance, void *gift);
+
+void new_GiveGift(BNM::IL2CPP::Il2CppObject *instance, BNM::IL2CPP::Il2CppObject *gift) {
+    if (feature.currencies) {
+        auto GiveGift = GetMethod<BNM::IL2CPP::Il2CppObject *>(instance, "GiveGift", {"expAmount"});
+        auto givenExp = GetMethod<int>(gift, "GetGivenExp")();
+        GiveGift(givenExp * feature.reward);
+        return;
+    }
     return old_GiveGift(instance, gift);
+}
+
+void (*old_ContactControllerCtor)(void *instance, void *data, void *profile);
+
+void new_ContactControllerCtor(BNM::IL2CPP::Il2CppObject *instance, void *data, void *profile) {
+    old_ContactControllerCtor(instance, data, profile);
+    if (feature.contacts) {
+        GetMethod<void>(instance, "AddTokens")(100);
+    }
 }
 
 
@@ -95,15 +126,25 @@ void OnLoaded() {
                                        "ResourcesManager",
                                        AssemblyCSharp);
     auto AddResource = ResourcesManager.GetMethod("AddResource", 4);
+    auto TrySubtractResource = ResourcesManager.GetMethod("TrySubtractResource", 4);
 
 
     auto RelationshipController = BNM::Class("Game.Scripts.Relationship",
                                              "RelationshipController",
                                              AssemblyCSharp);
 
-    auto GiveGift = RelationshipController.GetMethod("GiveGift");
+    auto GiveGift = RelationshipController.GetMethod("GiveGift", {"gift"});
+
+
+    auto ContactController = BNM::Class("Game.Scripts.Contacts",
+                                        "ContactController",
+                                        AssemblyCSharp);
+
+    auto ContactControllerCtor = ContactController.GetMethod(".ctor");
 
     BNM::BasicHook(AddResource, new_AddResource, old_AddResource);
+    BNM::BasicHook(TrySubtractResource, new_TrySubtractResource, old_TrySubtractResource);
     BNM::BasicHook(GiveGift, new_GiveGift, old_GiveGift);
+    BNM::BasicHook(ContactControllerCtor, new_ContactControllerCtor, old_ContactControllerCtor);
 
 }

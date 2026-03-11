@@ -30,25 +30,29 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Category:CategoryName
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
-    std::vector<std::string> feats = {
+    std::string feats[] = {
             "Toggle:Infinite Moves",
     };
     return toJobjectArray(env, feats);
 }
 
-bool moves = false;
+struct Feature {
+    bool moves{false};
+};
+
+Feature feature{};
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_support_Menu_valueChange(
         JNIEnv *env,
         jobject thiz,
         jint featIdx,
         jstring featName,
-        jobject value
+        jint value
 ) {
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            moves = toJboolean(env, value);
+            feature.moves = value;
             break;
         }
         default:
@@ -61,7 +65,7 @@ BNM::Method<void> AddMoves{};
 float (*old_PlayerMove)();
 
 float new_PlayerMove() {
-    if (moves) {
+    if (feature.moves) {
         AddMoves(1);
     }
     return old_PlayerMove();

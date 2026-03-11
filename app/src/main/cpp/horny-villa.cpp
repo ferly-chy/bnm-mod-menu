@@ -30,7 +30,7 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Category:CategoryName
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
-    std::vector<std::string> feats = {
+    std::string feats[] = {
             "Toggle:Currencies",
             "Toggle:Cards Progress",
             "Seekbar:Reward:1_10",
@@ -39,12 +39,12 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
 }
 
 struct Feature {
-    bool currencies{};
-    bool progress{};
-    int reward{};
+    bool currencies{false};
+    bool progress{false};
+    int reward{1};
 };
 
-Feature feature{false, true, 1};
+Feature feature{};
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_support_Menu_valueChange(
@@ -52,20 +52,20 @@ Java_com_android_support_Menu_valueChange(
         jobject thiz,
         jint featIdx,
         jstring featName,
-        jobject value
+        jint value
 ) {
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            feature.currencies = toJboolean(env, value);
+            feature.currencies = value;
             break;
         }
         case 1: {
-            feature.progress = toJboolean(env, value);
+            feature.progress = value;
             break;
         }
         case 2: {
-            feature.reward = toJint(env, value);
+            feature.reward = value;
             break;
         }
         default:

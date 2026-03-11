@@ -13,11 +13,34 @@
 #include <BNM/Field.hpp>
 #include <BNM/Property.hpp>
 
-jboolean toJboolean(JNIEnv *env, jobject obj);
+template<std::size_t N>
+jobjectArray toJobjectArray(JNIEnv *env, std::string (&feats)[N]) {
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (stringClass == nullptr) {
+        return nullptr;
+    }
+    jobjectArray ret = env->NewObjectArray(
+            N,
+            stringClass,
+            nullptr
+    );
+    if (ret == nullptr) {
+        return nullptr;
+    }
 
-jint toJint(JNIEnv *env, jobject obj);
+    for (int i = 0; i < N; ++i) {
+        jstring javaString = env->NewStringUTF(feats[i].c_str());
+        if (javaString == nullptr) {
+            // Handle error: String conversion failed
+            // You might need to release previously created objects here
+            return nullptr;
+        }
+        env->SetObjectArrayElement(ret, i, javaString);
+        env->DeleteLocalRef(javaString); // Release local reference
+    }
 
-jobjectArray toJobjectArray(JNIEnv *env, const std::vector<std::string> &feats);
+    return ret;
+}
 
 
 template<typename T>

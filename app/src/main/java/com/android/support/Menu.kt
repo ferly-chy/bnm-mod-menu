@@ -301,7 +301,11 @@ class Menu(val context: Activity) {
 
 
     external fun getFeatureList(): Array<String>?
-    external fun valueChange(featIdx: Int, featName: String, value: Any)
+    external fun valueChange(featIdx: Int, featName: String, value: Int)
+
+    fun valueChange(featIdx: Int, featName: String, value: Boolean) {
+        valueChange(featIdx, featName, if (value) 1 else 0)
+    }
 
     @Suppress("UNCHECKED_CAST")
     fun <T> read(key: String, defaultValue: T): T {
