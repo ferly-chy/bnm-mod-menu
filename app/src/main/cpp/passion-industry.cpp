@@ -32,16 +32,16 @@ JNI_OnLoad(JavaVM *vm, void *reserved) {
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
     std::string feats[] = {
-            "Toggle:Contacts",
             "Toggle:Currencies",
+            "Toggle:Contacts",
             "Seekbar:Reward:1_20"
     };
     return toJobjectArray(env, feats);
 }
 
 struct Feature {
-    bool contacts{false};
     bool currencies{false};
+    bool contacts{false};
     int reward{1};
 };
 
@@ -58,11 +58,11 @@ Java_com_android_support_Menu_valueChange(
     // featIdx: index in feature list
     switch (featIdx) {
         case 0: {
-            feature.contacts = value;
+            feature.currencies = value;
             break;
         }
         case 1: {
-            feature.currencies = value;
+            feature.contacts = value;
             break;
         }
         case 2: {
