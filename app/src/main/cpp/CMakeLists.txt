@@ -40,7 +40,7 @@ set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Dobby/${CMAKE_ANDROID_ARCH_ABI}/li
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        passion-industry.cpp
+        kinky-cats.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You
@@ -103,6 +103,18 @@ target_link_libraries(${LIB_NAME}
 
 # passion-industry
 set(LIB_NAME passion-industry)
+add_library(${LIB_NAME} SHARED
+        ${LIB_NAME}.cpp)
+
+target_link_libraries(${LIB_NAME}
+        # List libraries link to the target library
+        ${LIBDOBBY_PATH}
+        BNM
+        android
+        log)
+
+# kinky-cats
+set(LIB_NAME kinky-cats)
 add_library(${LIB_NAME} SHARED
         ${LIB_NAME}.cpp)
 
