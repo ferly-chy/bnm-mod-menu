@@ -32,7 +32,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
     std::string feats[] = {
             "Toggle:Currencies",
-            "Toggle:Cards Progress",
+            "Toggle:Characters",
             "Seekbar:Reward:1_10",
     };
     return toJobjectArray(env, feats);
@@ -40,7 +40,7 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
 
 struct Feature {
     bool currencies{false};
-    bool progress{false};
+    bool characters{false};
     int reward{1};
 };
 
@@ -61,7 +61,7 @@ Java_com_android_support_Menu_valueChange(
             break;
         }
         case 1: {
-            feature.progress = value;
+            feature.characters = value;
             break;
         }
         case 2: {
@@ -83,24 +83,20 @@ bool new_TryAdd(void *instance, int type, int amount, void *param) {
 bool (*old_Spend)(void *instance, int type, int value, void *param);
 
 bool new_Spend(void *instance, int type, int value, void *param) {
-    if (instance != nullptr) {
-        if (feature.currencies) {
-            new_TryAdd(instance, type, value, param);
-            return true;
-        }
+    if (feature.currencies) {
+        new_TryAdd(instance, type, value, param);
+        return true;
     }
     return old_Spend(instance, type, value, param);
 }
 
 void (*old_Init)(void *instance, int level, int progress);
 
-void new_Init(void *instance, int level, int progress) {
-    if (instance != nullptr) {
-        if (feature.progress) {
-            progress = progress + 100;
-        }
+void new_Init(BNM::IL2CPP::Il2CppObject *instance, int level, int progress) {
+    old_Init(instance, level, progress);
+    if (feature.characters) {
+        GetMethod<void>(instance, "AddSoul")(100);
     }
-    return old_Init(instance, level, progress);
 }
 
 
