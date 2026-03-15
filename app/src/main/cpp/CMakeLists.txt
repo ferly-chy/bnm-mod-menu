@@ -40,7 +40,7 @@ set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Dobby/${CMAKE_ANDROID_ARCH_ABI}/li
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        kinky-cats.cpp
+        wet-wealth.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

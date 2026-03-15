@@ -74,36 +74,21 @@ void new_AddItem(void *instance, void *item, int count) {
     return old_AddItem(instance, item, count * feature.reward);
 }
 
-void (*old_AddCharacterTemptation)(void *instance, void *character, int added);
+void (*old_AddTemptation)(void *instance, int added);
 
-void new_AddCharacterTemptation(void *instance, void *character, int added) {
-    return old_AddCharacterTemptation(instance, character, added * feature.reward);
+void new_AddTemptation(void *instance, int added) {
+    return old_AddTemptation(instance, added * feature.reward);
 }
 
-void (*old_Load)(void *instance);
+void (*old_UserCharacterCtor)(void *instance, void *collectedUserCharacter, void *characterStatic);
 
-void new_Load(BNM::IL2CPP::Il2CppObject *instance) {
-    old_Load(instance);
+void new_UserCharacterCtor(BNM::IL2CPP::Il2CppObject *instance, void *collectedUserCharacter,
+                           void *characterStatic) {
+    old_UserCharacterCtor(instance, collectedUserCharacter, characterStatic);
     if (feature.characters) {
-        auto userCharacterFactory = GetField<BNM::IL2CPP::Il2CppObject *>(instance,
-                                                                          "userCharacterFactory");
-        auto characterStaticUsecase = GetField<BNM::IL2CPP::Il2CppObject *>(userCharacterFactory,
-                                                                            "characterStaticUsecase");
-        auto characters = GetProperty<BNM::IL2CPP::Il2CppObject *>(characterStaticUsecase,
-                                                                   "Characters");
-
-        auto count = GetProperty<int>(characters, "Count");
-        auto getItem = GetMethod<BNM::IL2CPP::Il2CppObject *>(characters, "get_Item");
-        auto AddCharacterOrExperience = GetMethod<void>(instance,
-                                                        "AddCharacterOrExperience");
-        for (int i = 0; i < count; ++i) {
-            auto character = getItem(i);
-            int id = GetProperty<int>(character, "Id");
-            AddCharacterOrExperience(id, 100);
-        }
+        GetMethod<void>(instance, "AddExperience")(100);
     }
 }
-
 
 int (*old_GetLocationCurrentLevel)(void *instance, void *config);
 
@@ -131,10 +116,10 @@ void OnLoaded() {
                                            AssemblyCSharp);
     auto AddItem = UserInventoryUsecase.GetMethod("AddItem");
 
-    auto UserCharactersUsecase = BNM::Class("WetWealth.Characters", "UserCharactersUsecase",
-                                            AssemblyCSharp);
-    auto AddCharacterTemptation = UserCharactersUsecase.GetMethod("AddCharacterTemptation");
-    auto Load = UserCharactersUsecase.GetMethod("Load");
+    auto UserCharacter = BNM::Class("WetWealth.Characters", "UserCharacter",
+                                    AssemblyCSharp);
+    auto AddTemptation = UserCharacter.GetMethod("AddTemptation");
+    auto UserCharacterCtor = UserCharacter.GetMethod(".ctor");
 
     auto CityPaidLocationsUsecase = BNM::Class("WetWealth.PaidLocations",
                                                "CityPaidLocationsUsecase",
@@ -143,8 +128,8 @@ void OnLoaded() {
 
 
     BNM::BasicHook(AddItem, new_AddItem, old_AddItem);
-    BNM::BasicHook(AddCharacterTemptation, new_AddCharacterTemptation, old_AddCharacterTemptation);
-    BNM::BasicHook(Load, new_Load, old_Load);
+    BNM::BasicHook(AddTemptation, new_AddTemptation, old_AddTemptation);
+    BNM::BasicHook(UserCharacterCtor, new_UserCharacterCtor, old_UserCharacterCtor);
     BNM::BasicHook(GetLocationCurrentLevel, new_GetLocationCurrentLevel,
                    old_GetLocationCurrentLevel);
 }
