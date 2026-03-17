@@ -33,7 +33,7 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
     std::string feats[] = {
             "Toggle:Currencies",
             "Toggle:Characters",
-            "Seekbar:Reward:1_10",
+            "Seekbar:Reward:1_20",
     };
     return toJobjectArray(env, feats);
 }

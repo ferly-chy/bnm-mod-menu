@@ -33,7 +33,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
     std::string feats[] = {
             "Toggle:Currencies",
-            "Toggle:Contacts",
+            "Toggle:Characters",
             "Seekbar:Reward:1_20"
     };
     return toJobjectArray(env, feats);
@@ -41,7 +41,7 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
 
 struct Feature {
     bool currencies{false};
-    bool contacts{false};
+    bool characters{false};
     int reward{1};
 };
 
@@ -62,7 +62,7 @@ Java_com_android_support_Menu_valueChange(
             break;
         }
         case 1: {
-            feature.contacts = value;
+            feature.characters = value;
             break;
         }
         case 2: {
@@ -111,7 +111,7 @@ void (*old_ContactControllerCtor)(void *instance, void *data, void *profile);
 
 void new_ContactControllerCtor(BNM::IL2CPP::Il2CppObject *instance, void *data, void *profile) {
     old_ContactControllerCtor(instance, data, profile);
-    if (feature.contacts) {
+    if (feature.characters) {
         GetMethod<void>(instance, "AddTokens")(100);
     }
 }

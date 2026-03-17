@@ -41,7 +41,7 @@ Java_com_android_support_Menu_getFeatureList(JNIEnv *env, jobject thiz) {
 
 struct Feature {
     bool currencies{false};
-    bool charactors{false};
+    bool characters{false};
     int reward{1};
 };
 
@@ -62,7 +62,7 @@ Java_com_android_support_Menu_valueChange(
             break;
         }
         case 1: {
-            feature.charactors = value;
+            feature.characters = value;
             break;
         }
         case 2: {
@@ -96,7 +96,7 @@ void (*old_CardCharacterCtor)(void *instance, void *data, void *container);
 
 void new_CardCharacterCtor(BNM::IL2CPP::Il2CppObject *instance, void *data, void *container) {
     old_CardCharacterCtor(instance, data, container);
-    if (feature.charactors) {
+    if (feature.characters) {
         GetMethod<void>(instance, "AddCopy")(100);
     }
 }
