@@ -49,7 +49,6 @@ const val MENU_WIDTH = 290
 val MENU_BG_COLOR = "#EE1C2A35".toColorInt()//#AARRGGBB
 val MENU_FEATURE_BG_COLOR = "#DD141C22".toColorInt() //#AARRGGBB
 
-@Suppress("SpellCheckingInspection")
 val TEXT_COLOR = "#82CAFD".toColorInt()
 val TEXT_COLOR_2 = "#FFFFFF".toColorInt()
 val CATEGORY_BG_COLOR = "#2F3D4C".toColorInt()
@@ -247,6 +246,7 @@ class Menu(val context: Activity) {
         )
         scrollView.layoutParams = layoutParams
         scrollView.setBackgroundColor(MENU_FEATURE_BG_COLOR)
+        scrollView.setPadding(10)
         val mods = LinearLayout(context)
         mods.orientation = LinearLayout.VERTICAL
         val divider = ShapeDrawable()
@@ -307,7 +307,6 @@ class Menu(val context: Activity) {
         valueChange(featIdx, featName, if (value) 1 else 0)
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun <T> read(key: String, defaultValue: T): T {
         return when (defaultValue) {
             is String -> sharedPreferences.getString(key, defaultValue)
