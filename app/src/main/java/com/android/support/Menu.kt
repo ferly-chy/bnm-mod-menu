@@ -246,7 +246,7 @@ class Menu(val context: Activity) {
         )
         scrollView.layoutParams = layoutParams
         scrollView.setBackgroundColor(MENU_FEATURE_BG_COLOR)
-        scrollView.setPadding(10)
+        scrollView.setPadding(0, 10, 0, 10)
         val mods = LinearLayout(context)
         mods.orientation = LinearLayout.VERTICAL
         val divider = ShapeDrawable()
