@@ -4,7 +4,7 @@
 
 # Sets the minimum CMake version required for this project.
 cmake_minimum_required(VERSION 4.0)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 # Declares the project name. The project name can be accessed via ${ PROJECT_NAME},
 # Since this is the top level CMakeLists.txt, the project name is also accessible
@@ -26,13 +26,13 @@ project("ModBNM")
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/Dobby
+        ${CMAKE_CURRENT_SOURCE_DIR}/dobby/include
 )
-add_subdirectory(ByNameModding EXCLUDE_FROM_ALL)
+add_subdirectory(BNM EXCLUDE_FROM_ALL)
 
 # Specify the path to the pre-built static library for the current ABI
 # Adjust the path based on your file structure
-set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Dobby/${CMAKE_ANDROID_ARCH_ABI}/libdobby.a)
+set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dobby/lib/android/${CMAKE_ANDROID_ARCH_ABI}/libdobby.a)
 
 # In order to load a library into your app from Java/Kotlin, you must call
 # System.loadLibrary() and pass the name of the library defined here;
