@@ -10,7 +10,25 @@
 #include <BNM/Method.hpp>
 #include <BNM/Loading.hpp>
 #include "utils.h"
+#include "icon.h"
 
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_android_support_Menu_getTitle(JNIEnv* env, jobject) {
+    return env->NewStringUTF(TITLE);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_android_support_Menu_getSubTitle(JNIEnv* env, jobject) {
+    return env->NewStringUTF(SUB_TITLE);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_android_support_Menu_getStartIcon(JNIEnv* env, jobject) {
+    return env->NewStringUTF(START_ICON);
+}
 
 void OnLoaded();
 
