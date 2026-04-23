@@ -8,6 +8,8 @@
 #include <vector>
 #include <map>
 
+#include <unordered_map>
+#include <string_view>
 #include <BNM/UserSettings/GlobalSettings.hpp>
 #include <BNM/Utils.hpp>
 #include <BNM/BasicMonoStructures.hpp>
@@ -23,6 +25,14 @@
 
 /// @cond
 namespace BNM::Internal {
+
+    // Transparent hash for string_view in unordered_map
+    struct StringViewHash {
+        using is_transparent = void;
+        size_t operator()(std::string_view sv) const {
+            return std::hash<std::string_view>{}(sv);
+        }
+    };
 
 #pragma pack(push, 1)
 
@@ -94,6 +104,22 @@ namespace BNM::Internal {
     extern std::map<uint32_t, BNM::Class> customListsMap;
     extern int32_t finalizerSlot;
 
+    // Cache for images, classes and methods
+    typedef std::unordered_map<std::string, IL2CPP::Il2CppImage*> ImageCacheMap;
+    typedef std::unordered_map<const IL2CPP::Il2CppImage*, std::unordered_map<std::string, IL2CPP::Il2CppClass*>> ClassCacheMap;
+    typedef std::unordered_map<const IL2CPP::Il2CppClass*, std::unordered_map<std::string, IL2CPP::MethodInfo*>> MethodCacheMap;
+
+    extern ImageCacheMap imageCache;
+    extern ClassCacheMap classCache;
+    extern MethodCacheMap methodCache;
+
+#ifdef BNM_ALLOW_MULTI_THREADING_SYNC
+    extern std::shared_mutex cacheMutex;
+#endif
+
+    // Sentinel to identify BNM-created images
+    extern void* bnmImageSentinel;
+
     void Image$$GetTypes(const IL2CPP::Il2CppImage *image, bool exportedOnly, std::vector<BNM::IL2CPP::Il2CppClass *> *target);
 
     void Load();
@@ -149,7 +175,7 @@ namespace BNM::Internal {
         extern std::shared_mutex classesFindAccessMutex;
 #endif
         // A list with all the classes that BNM should create/modify
-        extern std::vector<MANAGEMENT_STRUCTURES::CustomClass *> *classesManagementVector;
+        extern std::vector<MANAGEMENT_STRUCTURES::CustomClass *> classesManagementVector;
 
         extern IL2CPP::Il2CppClass *(*old_Class$$FromIl2CppType)(IL2CPP::Il2CppType *type);
         IL2CPP::Il2CppClass *Class$$FromIl2CppType(IL2CPP::Il2CppType *type);
@@ -220,17 +246,20 @@ namespace BNM::Internal {
 #endif
 
     inline bool CompareImageName(IL2CPP::Il2CppImage *image, const std::string_view &name) {
-        bool value = image->name == name;
+        std::string_view imageName(image->name);
+        if (imageName == name) return true;
+
 #if UNITY_VER >= 171
-        value = value || image->nameNoExt == name;
-#else
-        if (!value) {
-            auto nameWithoutDll = std::string_view(image->name);
-            nameWithoutDll.remove_suffix(4);
-            value = nameWithoutDll == name;
-        }
+        if (image->nameNoExt == name) return true;
 #endif
-        return value;
+
+        // Safely check without extension
+        size_t lastDot = imageName.rfind('.');
+        if (lastDot != std::string_view::npos) {
+            return imageName.substr(0, lastDot) == name;
+        }
+
+        return false;
     }
 }
 /// @endcond

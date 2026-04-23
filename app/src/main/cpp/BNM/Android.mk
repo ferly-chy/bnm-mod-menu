@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := BNM
 
-LOCAL_CPPFLAGS += -std=c++26
+LOCAL_CPPFLAGS += -std=c++20
 
 INCLUDE_DIRS := $(BNM_LOCAL_PATH)/include \
                 $(BNM_LOCAL_PATH)/external/include \
@@ -12,6 +12,7 @@ INCLUDE_DIRS := $(BNM_LOCAL_PATH)/include \
                 $(BNM_LOCAL_PATH)/src/private
 
 LOCAL_SRC_FILES := \
+    $(BNM_LOCAL_PATH)/src/AssemblerUtils.cpp \
     $(BNM_LOCAL_PATH)/src/Class.cpp \
     $(BNM_LOCAL_PATH)/src/ClassesManagement.cpp \
     $(BNM_LOCAL_PATH)/src/Coroutine.cpp \

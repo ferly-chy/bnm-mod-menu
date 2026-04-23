@@ -3,6 +3,17 @@
 #ifdef BNM_CLASSES_MANAGEMENT
 
 #include <Internals.hpp>
+#include <atomic>
+
+static inline void SafePatchVTable(BNM::IL2CPP::VirtualInvokeData* vtable, void* newMethodPtr, const BNM::IL2CPP::MethodInfo* newMethod) {
+    // 1. Update metadata first
+    auto atomicMethod = reinterpret_cast<std::atomic<const BNM::IL2CPP::MethodInfo*>*>(&vtable->method);
+    atomicMethod->store(newMethod, std::memory_order_release);
+
+    // 2. Update execution pointer with release semantics to ensure metadata is visible
+    auto atomicPtr = reinterpret_cast<std::atomic<void*>*>(&vtable->methodPtr);
+    atomicPtr->store(newMethodPtr, std::memory_order_release);
+}
 
 #define BNM_CLASS_ALLOCATED_METHODS_FLAG 0x01000000
 #define BNM_CLASS_ALLOCATED_FIELDS_FLAG 0x02000000
@@ -11,21 +22,32 @@
 
 using namespace BNM;
 
+namespace BNM::Internal::ClassesManagement {
+    struct MetadataTracker {
+        std::vector<void*> allocations;
+        void* Track(void* ptr) { if (ptr) allocations.push_back(ptr); return ptr; }
+        void Commit() {
+            for (auto p : allocations) TrackAllocation(p);
+            allocations.clear();
+        }
+        ~MetadataTracker() { for (auto p : allocations) BNM_free(p); }
+    };
+    thread_local MetadataTracker* currentTracker = nullptr;
+}
+
 static inline void *BNM_malloc_tracked(size_t size) {
     void *ptr = BNM_malloc(size);
-    Internal::ClassesManagement::TrackAllocation(ptr);
+    if (BNM::Internal::ClassesManagement::currentTracker) BNM::Internal::ClassesManagement::currentTracker->Track(ptr);
+    else BNM::Internal::ClassesManagement::TrackAllocation(ptr);
     return ptr;
 }
 #define BNM_MALLOC_TRACKED(size) BNM_malloc_tracked(size)
 
 void MANAGEMENT_STRUCTURES::AddClass(CustomClass *_class) {
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
-    std::unique_lock lock(Internal::ClassesManagement::classesFindAccessMutex);
+    std::unique_lock lock(BNM::Internal::ClassesManagement::classesFindAccessMutex);
 #endif
-    if (!Internal::ClassesManagement::classesManagementVector)
-        Internal::ClassesManagement::classesManagementVector = new (BNM_MALLOC_TRACKED(sizeof(std::vector<MANAGEMENT_STRUCTURES::CustomClass *>))) std::vector<MANAGEMENT_STRUCTURES::CustomClass *>();
-
-    Internal::ClassesManagement::classesManagementVector->push_back(_class);
+    BNM::Internal::ClassesManagement::classesManagementVector.push_back(_class);
 }
 
 
@@ -64,18 +86,19 @@ static bool HasInterface(IL2CPP::Il2CppClass *parent, IL2CPP::Il2CppClass *inter
 // Class type setup code
 static void SetupTypes(IL2CPP::Il2CppClass *target);
 
-void Internal::ClassesManagement::ProcessCustomClasses() {
-    if (classesManagementVector == nullptr) return;
+void BNM::Internal::ClassesManagement::ProcessCustomClasses() {
+    if (classesManagementVector.empty()) return;
 
-    for (auto customClass : *classesManagementVector) BNM::ClassesManagement::ProcessClassRuntime(customClass);
+    for (auto customClass : classesManagementVector) BNM::ClassesManagement::ProcessClassRuntime(customClass);
 
-    // Explicitly call destructor for std::vector when using placement new
-    classesManagementVector->~vector();
-    BNM_free((void *) classesManagementVector);
-    classesManagementVector = nullptr;
+    classesManagementVector.clear();
+    classesManagementVector.shrink_to_fit();
 }
 
 void ClassesManagement::ProcessClassRuntime(MANAGEMENT_STRUCTURES::CustomClass *customClass) {
+    BNM::Internal::ClassesManagement::MetadataTracker tracker;
+    BNM::Internal::ClassesManagement::currentTracker = &tracker;
+
     auto &type = customClass->_targetType;
     if (!type._stack.IsEmpty()) type._RemoveBit();
     auto info = GetClassInfo(type);
@@ -87,6 +110,10 @@ void ClassesManagement::ProcessClassRuntime(MANAGEMENT_STRUCTURES::CustomClass *
         Utils::LogCompileTimeClass(type);
 #endif
     }
+
+    tracker.Commit();
+    BNM::Internal::ClassesManagement::currentTracker = nullptr;
+
     type.Free();
     customClass->_interfaces.clear();
     customClass->_interfaces.shrink_to_fit();
@@ -142,11 +169,18 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
 
             memcpy(newMethods + oldCount, methodsToAdd.data(), methodsToAdd.size() * sizeof(IL2CPP::MethodInfo *));
 
-            if ((klass->flags & BNM_CLASS_ALLOCATED_METHODS_FLAG) == BNM_CLASS_ALLOCATED_METHODS_FLAG) BNM_free(klass->methods);
+            // To prevent dangling pointers, we do not free the old methods array if it was already allocated.
+            // Classes modification happens rarely, so this small leak is acceptable for stability.
+            // if ((klass->flags & BNM_CLASS_ALLOCATED_METHODS_FLAG) == BNM_CLASS_ALLOCATED_METHODS_FLAG) BNM_free(klass->methods);
             klass->flags |= BNM_CLASS_ALLOCATED_METHODS_FLAG;
 
-            klass->methods = (const IL2CPP::MethodInfo **)newMethods;
-            klass->method_count += methodsToAdd.size();
+            // Atomic update of the methods array pointer
+            auto atomicMethods = reinterpret_cast<std::atomic<const IL2CPP::MethodInfo**>*>(&klass->methods);
+            atomicMethods->store((const IL2CPP::MethodInfo **)newMethods, std::memory_order_release);
+
+            // Atomic update of the method count
+            auto atomicCount = reinterpret_cast<std::atomic<uint16_t>*>(&klass->method_count);
+            atomicCount->store((uint16_t)(oldCount + methodsToAdd.size()), std::memory_order_release);
         }
     }
 
@@ -175,7 +209,19 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
             BNM_LOG_DEBUG(DBG_BNM_MSG_ClassesManagement_ModifyClasses_Added_Field, field->_name.data());
         }
 
-        klass->fields = newFields;
+        if ((klass->flags & BNM_CLASS_ALLOCATED_FIELDS_FLAG) == BNM_CLASS_ALLOCATED_FIELDS_FLAG) {
+            // To prevent dangling pointers, we do not free the old fields array if it was already allocated.
+            // if ((klass->flags & BNM_CLASS_ALLOCATED_FIELDS_FLAG) == BNM_CLASS_ALLOCATED_FIELDS_FLAG) BNM_free(klass->fields);
+        }
+        klass->flags |= BNM_CLASS_ALLOCATED_FIELDS_FLAG;
+
+        // Atomic update of the fields array pointer
+        auto atomicFields = reinterpret_cast<std::atomic<IL2CPP::FieldInfo*>*>(&klass->fields);
+        atomicFields->store(newFields, std::memory_order_release);
+
+        // Atomic update of the field count
+        auto atomicCount = reinterpret_cast<std::atomic<uint16_t>*>(&klass->field_count);
+        atomicCount->store((uint16_t)(oldCount + newFieldsCount), std::memory_order_release);
     }
 
     customClass->myClass = klass;
@@ -196,6 +242,14 @@ static void CreateClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, const C
         }
     } else image = Image(baseImageName);
     if (!image) image = MakeImage(classInfo._imageName);
+
+    // Check if class already exists in the target image to prevent duplicate registration
+    if (auto existingClass = Internal::TryGetClassInImage(image._data, classInfo._namespace ? classInfo._namespace : "", classInfo._name)) {
+        BNM_LOG_WARN("BNM: Class %s::%s already exists in image %s. Switching to ModifyClass instead of CreateClass.",
+                     classInfo._namespace ? classInfo._namespace : "", classInfo._name, image._data->name);
+        ModifyClass(customClass, existingClass);
+        return;
+    }
 
     BNM_LOG_DEBUG(DBG_BNM_MSG_ClassesManagement_CreateClass_Target, classInfo._namespace ? classInfo._namespace : &forEmptyString, classInfo._name, image._data->name);
     
@@ -230,8 +284,8 @@ static void CreateClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, const C
     }
 
     // Create all new methods
-    uint8_t hasFinalize = 0;
-    auto methods = (const IL2CPP::MethodInfo **) BNM_MALLOC_TRACKED(customClass->_methods.size() * sizeof(IL2CPP::MethodInfo *));
+    uint8_t hasFinalize = parent->has_finalize;
+    std::vector<const IL2CPP::MethodInfo *> methods(customClass->_methods.size());
 
     for (size_t i = 0; i < customClass->_methods.size(); ++i) {
         auto method = customClass->_methods[i];
@@ -256,7 +310,7 @@ static void CreateClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, const C
                     if (Class(type).GetClass() != method->_parameterTypes[p].ToIl2CppClass()) goto NEXT;
                 }
 
-                if (!hasFinalize) hasFinalize = v == Internal::finalizerSlot;
+                if (!hasFinalize && Internal::finalizerSlot != -1) hasFinalize = (int32_t)v == Internal::finalizerSlot;
                 method->_origin = (IL2CPP::MethodInfo *) vTable.method;
                 method->_originalAddress = (void *) (vTable.method ? vTable.method->methodPointer : nullptr);
                 method->myInfo->slot = v;
@@ -346,8 +400,9 @@ static void CreateClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, const C
 
     // Completing the creation of methods
     for (auto method : customClass->_methods) PRIVATE_INTERNAL::GetMethodClass(method->myInfo) = klass;
-    klass->method_count = customClass->_methods.size();
-    klass->methods = methods;
+    klass->method_count = methods.size();
+    klass->methods = (const IL2CPP::MethodInfo **) BNM_MALLOC_TRACKED(methods.size() * sizeof(IL2CPP::MethodInfo *));
+    memcpy((void *)klass->methods, methods.data(), methods.size() * sizeof(IL2CPP::MethodInfo *));
     klass->has_finalize = hasFinalize;
 
     // Copy the parent flags, remove the ABSTRACT and INTERFACE flag if it exists and make type PUBLIC
@@ -599,7 +654,7 @@ static IL2CPP::Il2CppImage *MakeImage(std::string_view imageName) {
     newAsm->referencedAssemblyCount = 0;
 
     // Using this, BNM can check if it has created this assembly
-    newImg->nameToClassHashTable = (decltype(newImg->nameToClassHashTable)) -0x424e4d;
+    newImg->nameToClassHashTable = (decltype(newImg->nameToClassHashTable)) Internal::bnmImageSentinel;
 
     // Add an assembly to the list
     Internal::il2cppMethods.Assembly$$GetAllAssemblies()->push_back(newAsm);
@@ -680,8 +735,7 @@ static IL2CPP::MethodInfo *ProcessCustomMethod(MANAGEMENT_STRUCTURES::CustomMeth
             method->_origin = parent;
             method->_originalAddress = (void *) parent->methodPointer;
             originalMethod->slot = slot;
-            vTable->methodPtr = (void (*)()) method->_address;
-            vTable->method = originalMethod;
+            SafePatchVTable(vTable, method->_address, originalMethod);
             return originalMethod;
         }
     }
@@ -705,7 +759,7 @@ static IL2CPP::MethodInfo *ProcessCustomMethod(MANAGEMENT_STRUCTURES::CustomMeth
     if (auto vTable = TryFindVirtualMethod(target, originalMethod); vTable != nullptr) {
         method->_origin = (IL2CPP::MethodInfo *) vTable->method;
         method->_originalAddress = (void *) method->_origin->methodPointer;
-        vTable->methodPtr = (void(*)()) method->_address;
+        SafePatchVTable(vTable, method->_address, vTable->method);
         if (hooked) *hooked = true;
         return originalMethod;
     }

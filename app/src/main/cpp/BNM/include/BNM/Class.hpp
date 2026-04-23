@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <span>
 
 #include "UserSettings/GlobalSettings.hpp"
 #include "Il2CppHeaders.hpp"
@@ -96,6 +97,27 @@ namespace BNM {
         Class(const std::string_view &_namespace, const std::string_view &name, const BNM::Image &image);
 
         /**
+            @brief Get all interfaces implemented by target class.
+
+            Gets all interfaces implemented by target class and of its parents.
+
+            @param includeParent Should include interfaces from parents
+
+            @return Vector of interfaces if anyone of them exists.
+        */
+        [[nodiscard]] std::vector<BNM::Class> GetInterfaces(bool includeParent = true) const;
+
+        /**
+            @brief Get interfaces of target class as a span.
+
+            Gets interfaces of target class.
+
+            @return Span of interfaces if anyone of them exists.
+        */
+        [[nodiscard]] std::span<BNM::IL2CPP::Il2CppClass *> GetInterfacesSpan() const;
+
+
+        /**
             @brief Get all inner classes of target class.
 
             Gets all inner classes of target class and of its parents.
@@ -105,6 +127,15 @@ namespace BNM {
             @return Vector of inner classes if anyone of them exists.
         */
         [[nodiscard]] std::vector<BNM::Class> GetInnerClasses(bool includeParent = true) const;
+
+        /**
+            @brief Get inner classes of target class as a span.
+
+            Gets inner classes of target class.
+
+            @return Span of inner classes if anyone of them exists.
+        */
+        [[nodiscard]] std::span<BNM::IL2CPP::Il2CppClass *> GetInnerClassesSpan() const;
 
         /**
             @brief Get all fields of target class.
@@ -118,6 +149,15 @@ namespace BNM {
         [[nodiscard]] std::vector<BNM::FieldBase> GetFields(bool includeParent = true) const;
 
         /**
+            @brief Get fields of target class as a span.
+
+            Gets fields of target class.
+
+            @return Span of fields if anyone of them exists.
+        */
+        [[nodiscard]] std::span<BNM::IL2CPP::FieldInfo> GetFieldsSpan() const;
+
+        /**
             @brief Get all methods of target class.
 
             Gets all methods of target class and of its parents.
@@ -127,6 +167,15 @@ namespace BNM {
             @return Vector of methods if anyone of them exists.
         */
         [[nodiscard]] std::vector<BNM::MethodBase> GetMethods(bool includeParent = true) const;
+
+        /**
+            @brief Get methods of target class as a span.
+
+            Gets methods of target class.
+
+            @return Span of methods if anyone of them exists.
+        */
+        [[nodiscard]] std::span<const BNM::IL2CPP::MethodInfo *> GetMethodsSpan() const;
 
         /**
             @brief Get all properties of target class.
@@ -454,13 +503,12 @@ namespace BNM {
             @tparam T Non pointer object type
             @return Boxed object
         */
-        template<typename T>
-        requires (!std::is_pointer_v<T>)
+        template<typename T, typename = std::enable_if<!std::is_pointer_v<T>>>
         IL2CPP::Il2CppObject *BoxObject(T obj) const {
             BNM_LOG_ERR_IF(!_data, DBG_BNM_MSG_Class_Dead_Error);
             if (!_data) return nullptr;
             TryInit();
-            return BoxObject(_data, reinterpret_cast<void *>(&obj));
+            return BoxObject(_data, (void *) &obj);
         }
 
         /**
@@ -754,9 +802,8 @@ namespace BNM {
 
         @return True if object is inherited from target class.
     */
-    template<typename T>
-    requires std::is_pointer_v<T>
-    bool IsA(T object, IL2CPP::Il2CppClass *_class) { return IsA<BNM::IL2CPP::Il2CppObject *>(reinterpret_cast<IL2CPP::Il2CppObject *>(object), _class); }
+    template<typename T, typename = std::enable_if<std::is_pointer_v<T>>>
+    bool IsA(T object, IL2CPP::Il2CppClass *_class) { return IsA<BNM::IL2CPP::Il2CppObject *>((IL2CPP::Il2CppObject *)object, _class); }
 
     /**
         @brief Check if Il2CppObject is inherited from class.
@@ -780,8 +827,7 @@ namespace BNM {
 
         @return True if object is inherited from target class.
     */
-    template<typename T>
-    requires std::is_pointer_v<T>
+    template<typename T, typename = std::enable_if<std::is_pointer<T>::value>>
     bool IsA(T object, Class _class) { return IsA(object, _class.GetClass()); }
 
     /**
@@ -795,8 +841,7 @@ namespace BNM {
 
         @return True if object is inherited from target class.
     */
-    template<typename T>
-    requires std::is_pointer_v<T>
+    template<typename T, typename = std::enable_if<std::is_pointer<T>::value>>
     bool IsA(T object, IL2CPP::Il2CppObject *_object) { if (!_object) return false; return IsA(object, _object->klass); }
 
     /**
@@ -810,8 +855,7 @@ namespace BNM {
 
         @return True if object is inherited from target type.
     */
-    template<typename T>
-    requires std::is_pointer_v<T>
+    template<typename T, typename = std::enable_if<std::is_pointer<T>::value>>
     bool IsA(T object, MonoType *_type) { return IsA(object, Class(_type)); }
 
 #ifdef BNM_OLD_GOOD_DAYS

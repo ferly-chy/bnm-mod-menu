@@ -111,16 +111,22 @@ void Utils::LogCompileTimeClass(const CompileTimeClass &compileTimeClass) {
 
     CompileTimeClass tmp{};
 
-    compileTimeClass._stack.ForEach([&tmp](CompileTimeClass::_BaseInfo *info) {
+    auto &stack = compileTimeClass._stack;
+    auto lastElement = stack.lastElement;
+    auto current = lastElement->next;
+    do {
+        auto info = current->value;
         auto index = (uint8_t) info->_baseType;
         if (index >= (uint8_t) CompileTimeClass::_BaseType::MaxCount) {
-            BNM_LOG_ERR("\t" DBG_BNM_MSG_CompileTimeClass_ToClass_OoB_Warn, static_cast<size_t>(index));
-            return;
+            BNM_LOG_ERR("\t" DBG_BNM_MSG_CompileTimeClass_ToClass_OoB_Warn, (size_t)index);
+            continue;
         }
         CompileTimeClassProcessors::processors[index](tmp, info);
 
         LogCompileTimeClassInfo(info, tmp);
-    });
+
+        current = current->next;
+    } while (current != lastElement->next);
 }
 #endif
 

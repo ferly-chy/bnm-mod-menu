@@ -22,39 +22,39 @@ namespace BNM::Utils {
         T *value{};
         /// @cond
         constexpr DataIterator() = default;
-        constexpr DataIterator(const T *value) : value(const_cast<T *>(value)) {}
-        [[nodiscard]] inline T& operator *() {
+        constexpr DataIterator(const T *value) : value((T *)value) {}
+        inline T& operator *() {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
-        [[nodiscard]] inline T& operator *() const {
+        inline T& operator *() const {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
-        [[nodiscard]] inline operator T&() {
+        inline operator T&() {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
-        [[nodiscard]] inline operator T&() const {
+        inline operator T&() const {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
-        [[nodiscard]] inline T& operator ->() {
+        inline T& operator ->() {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
-        [[nodiscard]] inline T& operator ->() const {
+        inline T& operator ->() const {
             BNM_LOG_ERR_IF(!value, DBG_BNM_MSG_DataIterator_Error);
             return *value;
         }
         inline DataIterator &operator=(T t) {
             BNM_LOG_ERR_IF(!t, DBG_BNM_MSG_DataIterator_Error);
-            *this->value = *reinterpret_cast<T*>(&t);
+            *this->value = *(T*)&t;
             return *this;
         }
         inline DataIterator &operator=(T t) const {
             BNM_LOG_ERR_IF(!t, DBG_BNM_MSG_DataIterator_Error);
-            *this->value = *reinterpret_cast<T*>(&t);
+            *this->value = *(T*)&t;
             return *this;
         }
         /// @endcond

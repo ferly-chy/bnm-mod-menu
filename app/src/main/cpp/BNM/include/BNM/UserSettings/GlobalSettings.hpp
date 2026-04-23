@@ -1,8 +1,15 @@
+#pragma once
+#include <cassert>
 #if __cplusplus < 202002L
 static_assert(false, "ByNameModding requires C++20 and above!");
 #endif
 
-#pragma once
+// Pointer size validation
+#if defined(__LP64__) || defined(_LP64) || defined(__x86_64__) || defined(__aarch64__)
+static_assert(sizeof(void*) == 8, "BNM: Compilation for 64-bit architecture detected, but pointer size is not 8 bytes!");
+#else
+static_assert(sizeof(void*) == 4, "BNM: Compilation for 32-bit architecture detected, but pointer size is not 4 bytes!");
+#endif
 
 //#define UNITY_VER 56 // 5.6.4f1
 //#define UNITY_VER 171 // 2017.1.x
@@ -27,6 +34,10 @@ static_assert(false, "ByNameModding requires C++20 and above!");
 
 #define UNITY_PATCH_VER 32 // For special cases
                            // Untuk kasus khusus
+
+#if UNITY_VER == 211 && !defined(UNITY_PATCH_VER)
+static_assert(false, "BNM: For Unity 2021.1.x, you must define UNITY_PATCH_VER in GlobalSettings.hpp!");
+#endif
 
 //! Allow to use deprecated methods (if any)
 //! Izinkan penggunaan metode usang (jika ada)
@@ -122,6 +133,7 @@ inline void Unhook(PTR_T ptr) {
 */
 
 
+
 // Dobby
 #include <dobby.h>
 
@@ -142,8 +154,9 @@ inline void Unhook(PTR_T ptr) {
     if ((void *) ptr != nullptr) DobbyDestroy((void *)ptr);
 }
 
+
+
 // Dummy
-#include <cassert>
 /*
 static_assert(false, "No hooking software!");
 
@@ -167,7 +180,6 @@ inline void Unhook(PTR_T ptr) {
 
 
 #include <dlfcn.h>
-
 // If you need to hide dlfcn calls or use your dl to load BNM in the game from the outside
 // Jika Anda perlu menyembunyikan panggilan dlfcn atau menggunakan dl Anda untuk memuat BNM di game dari luar
 #define BNM_dlopen dlopen
@@ -232,4 +244,4 @@ namespace BNM {
 #endif
 }
 
-#define BNM_VER "2.5.2"
+#define BNM_VER "2.5.3"

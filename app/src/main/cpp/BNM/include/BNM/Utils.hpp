@@ -19,14 +19,13 @@ namespace BNM {
         @brief Macro function for checking pointer for null. Due to noinline attribute allows to check even `this` of objects.
     */
     template <typename T>
-    NO_INLINE bool CheckForNull(T obj) { return static_cast<bool>(obj); }
+    NO_INLINE bool CheckForNull(T obj) { return (void *) obj; }
 
     /**
         @brief Macro function for checking if pointer points to valid address.
         @return True if address is valid.
     */
-    template <typename T>
-    requires std::is_pointer_v<T>
+    template <typename T, typename = std::enable_if<std::is_pointer_v<T>>>
     inline bool IsAllocated(T x) {
 #ifdef BNM_ALLOW_SAFE_IS_ALLOCATED
         if (!x) return false;
@@ -36,7 +35,7 @@ namespace BNM {
         char c;
         bool ok = true;
         sighandler_t old_handler = signal(SIGSEGV, handler);
-        if (!setjmp (jump)) c = *reinterpret_cast<const volatile char *>(x); else ok = false; // NOLINT
+        if (!setjmp (jump)) c = *(char *) x; else ok = false; // NOLINT
         (void)c;
         signal(SIGSEGV, old_handler);
         return ok;
@@ -76,11 +75,10 @@ namespace BNM {
         @return Unboxed object of passed type
     */
     template<typename T>
-    inline T UnboxObject(T obj) { return (T)(void *)(reinterpret_cast<char *>((void *)obj) + sizeof(BNM::IL2CPP::Il2CppObject)); }
+    inline T UnboxObject(T obj) { return (T)(void *)(((char *)obj) + sizeof(BNM::IL2CPP::Il2CppObject)); }
 
 #ifdef BNM_DEPRECATED
-    template <typename T>
-    requires std::is_pointer_v<T>
+    template <typename T, typename = std::enable_if<std::is_pointer<T>::value>>
     inline T CheckObj(T obj) {
         if (obj && IsAllocated(obj)) return obj;
         return nullptr;
@@ -88,7 +86,7 @@ namespace BNM {
 
     template<typename MET_T, typename PTR_T>
     inline void InitFunc(MET_T& method, PTR_T ptr) {
-        *reinterpret_cast<void **>(&method) = reinterpret_cast<void *>(ptr);
+        *(void **)&method = (void *)ptr;
     }
 #endif
 
@@ -184,7 +182,7 @@ namespace BNM {
 
         Element *lastElement{};
 
-        constexpr ForwardList() noexcept = default;
+        inline ForwardList() = default;
 
         inline ~ForwardList() { Clear(); }
 
@@ -214,24 +212,12 @@ namespace BNM {
             return *this;
         }
 
-        inline ForwardList(ForwardList&& other) noexcept : lastElement(other.lastElement) {
-            other.lastElement = nullptr;
-        }
-
-        inline ForwardList& operator=(ForwardList&& other) noexcept {
-            if (this == &other) return *this;
-            Clear();
-            lastElement = other.lastElement;
-            other.lastElement = nullptr;
-            return *this;
-        }
-
-        [[nodiscard]] inline bool IsEmpty() const noexcept { return !lastElement; }
+        [[nodiscard]] inline bool IsEmpty() const { return !lastElement; }
 
         inline void Add(T value) {
-            auto newElement = static_cast<Element *>(BNM_malloc(sizeof(Element)));
+            auto newElement = (Element *) BNM_malloc(sizeof(Element));
             newElement->next = nullptr;
-            newElement->value = std::move(value);
+            newElement->value = value;
 
             if (IsEmpty()) {
                 newElement->next = newElement;
@@ -243,7 +229,7 @@ namespace BNM {
             }
         }
 
-        inline void Clear(void (*onElementFreed)(T) = nullptr) {
+        inline void Clear(void (*onElementFreed)(T value) = nullptr) {
             if (IsEmpty()) return;
 
             auto current = lastElement->next;
@@ -252,40 +238,11 @@ namespace BNM {
             while (current) {
                 auto next = current->next;
                 if (onElementFreed) onElementFreed(current->value);
-                current->~Element();
                 BNM_free(current);
                 current = next;
             }
 
             lastElement = nullptr;
-        }
-
-        template<typename Func>
-        inline void ForEach(Func&& func) const {
-            if (IsEmpty()) return;
-            auto current = lastElement->next;
-            do {
-                if constexpr (std::is_invocable_v<Func, const T&>) {
-                    func(current->value);
-                } else {
-                    func(current);
-                }
-                current = current->next;
-            } while (current != lastElement->next);
-        }
-
-        template<typename Func>
-        inline void ForEach(Func&& func) {
-            if (IsEmpty()) return;
-            auto current = lastElement->next;
-            do {
-                if constexpr (std::is_invocable_v<Func, T&>) {
-                    func(current->value);
-                } else {
-                    func(current);
-                }
-                current = current->next;
-            } while (current != lastElement->next);
         }
     };
 }

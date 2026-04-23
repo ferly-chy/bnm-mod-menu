@@ -6,8 +6,18 @@
 
 #include <functional>
 
+#if __has_include(<coroutine>)
 #include <coroutine>
-
+#elif __has_include(<experimental/coroutine>)
+#include <experimental/coroutine>
+namespace std {
+    template<typename T>
+    using coroutine_handle = std::experimental::coroutine_handle<T>;
+    using suspend_always = std::experimental::suspend_always;
+    template <typename Ret, typename... Args>
+    using coroutine_traits = std::experimental::coroutine_traits<Ret, Args...>;
+}
+#endif
 
 #include "Il2CppHeaders.hpp"
 

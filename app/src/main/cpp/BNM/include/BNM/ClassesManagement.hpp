@@ -90,15 +90,12 @@ namespace BNM {
 
         namespace _InvokerHelper {
             // Unpack argument
-            template<typename T>
-            requires std::is_reference_v<T>
-            inline constexpr T &UnpackArg(void *arg) { return *static_cast<std::remove_reference_t<T> *>(arg); }
-
-            template<typename T>
-            requires (!std::is_reference_v<T>)
+            template<typename T, std::enable_if_t<std::is_reference_v<T>, bool> = true>
+            inline constexpr T &UnpackArg(void *arg) { return *(std::remove_reference_t<T> *)arg; }
+            template<typename T, std::enable_if_t<!std::is_reference_v<T>, bool> = true>
             inline constexpr T UnpackArg(void *arg) {
-                if constexpr (std::is_pointer_v<T>) return static_cast<T>(arg);
-                else return *static_cast<T *>(arg);
+                if constexpr (std::is_pointer_v<T>) return (T) arg;
+                else return *(T *)arg;
             }
 
 #if UNITY_VER >= 211
