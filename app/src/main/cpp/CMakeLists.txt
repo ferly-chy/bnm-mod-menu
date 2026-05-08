@@ -40,7 +40,7 @@ set(LIBDOBBY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dobby/lib/android/${CMAKE_ANDROID_
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        horny-villa.cpp
+        harem-fantasy.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You
@@ -115,6 +115,18 @@ target_link_libraries(${LIB_NAME}
 
 # kinky-cats
 set(LIB_NAME kinky-cats)
+add_library(${LIB_NAME} SHARED
+        ${LIB_NAME}.cpp)
+
+target_link_libraries(${LIB_NAME}
+        # List libraries link to the target library
+        ${LIBDOBBY_PATH}
+        BNM
+        android
+        log)
+
+# harem-fantasy
+set(LIB_NAME harem-fantasy)
 add_library(${LIB_NAME} SHARED
         ${LIB_NAME}.cpp)
 
