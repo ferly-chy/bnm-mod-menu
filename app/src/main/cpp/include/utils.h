@@ -51,6 +51,12 @@ BNM::Method<T> GetMethod(BNM::IL2CPP::Il2CppObject *instant, const std::string_v
 }
 
 template<typename T>
+BNM::Method<T> GetMethod(void *instant, const std::string_view &name,
+                         int parameters = -1) {
+    return GetMethod<T>(static_cast<BNM::IL2CPP::Il2CppObject *>(instant), name, parameters);
+}
+
+template<typename T>
 BNM::Method<T> GetMethod(BNM::IL2CPP::Il2CppObject *instant, const std::string_view &name,
                          const std::initializer_list<std::string_view> &parameterNames) {
     BNM::Method<T> method = BNM::Class(instant->klass).GetMethod(name, parameterNames);
@@ -58,10 +64,23 @@ BNM::Method<T> GetMethod(BNM::IL2CPP::Il2CppObject *instant, const std::string_v
 }
 
 template<typename T>
+BNM::Method<T> GetMethod(void *instant, const std::string_view &name,
+                         const std::initializer_list<std::string_view> &parameterNames) {
+    return GetMethod<T>(static_cast<BNM::IL2CPP::Il2CppObject *>(instant), name, parameterNames);
+}
+
+
+template<typename T>
 BNM::Method<T> GetMethod(BNM::IL2CPP::Il2CppObject *instant, const std::string_view &name,
                          const std::initializer_list<BNM::CompileTimeClass> &parameterTypes) {
     BNM::Method<T> method = BNM::Class(instant->klass).GetMethod(name, parameterTypes);
     return method[instant];
+}
+
+template<typename T>
+BNM::Method<T> GetMethod(void *instant, const std::string_view &name,
+                         const std::initializer_list<BNM::CompileTimeClass> &parameterTypes) {
+    return GetMethod<T>(static_cast<BNM::IL2CPP::Il2CppObject *>(instant), name, parameterTypes);
 }
 
 template<typename T>
