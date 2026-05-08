@@ -1,0 +1,15 @@
+/cmake-build/
+/out
+*.DS_Store
+/extlibs/vcpkg
+.idea/workspace.xml
+/build/
+/clang-coverage/
+*.gcov
+*.bin
+# pixi lock
+pixi.lock
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+/site/

@@ -25,6 +25,7 @@ namespace BNM::Internal {
     ImageCacheMap imageCache{};
     ClassCacheMap classCache{};
     MethodCacheMap methodCache{};
+    GlobalClassCacheMap globalClassCache{};
 
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
     std::shared_mutex cacheMutex{};
@@ -89,11 +90,10 @@ namespace BNM::Internal {
 using namespace BNM;
 
 IL2CPP::Il2CppImage *Internal::TryGetImage(const std::string_view &_name) {
-    std::string nameStr(_name);
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
     std::shared_lock lock(Internal::cacheMutex);
 #endif
-    if (auto it = Internal::imageCache.find(nameStr); it != Internal::imageCache.end())
+    if (auto it = Internal::imageCache.find(_name); it != Internal::imageCache.end())
         return it->second;
 
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
@@ -109,7 +109,7 @@ IL2CPP::Il2CppImage *Internal::TryGetImage(const std::string_view &_name) {
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
         std::unique_lock writeLock(Internal::cacheMutex);
 #endif
-        Internal::imageCache[nameStr] = currentImage;
+        Internal::imageCache[std::string(_name)] = currentImage;
         return currentImage;
     }
 
@@ -119,11 +119,17 @@ IL2CPP::Il2CppImage *Internal::TryGetImage(const std::string_view &_name) {
 IL2CPP::Il2CppClass *Internal::TryGetClassInImage(const IL2CPP::Il2CppImage *image, const std::string_view &_namespace, const std::string_view &_name) {
     if (!image) return nullptr;
 
-    std::string fullName;
-    fullName.reserve(_namespace.size() + _name.size() + 2);
-    fullName += _namespace;
-    fullName += "::";
-    fullName += _name;
+    char fullNameBuf[_namespace.size() + _name.size() + 3];
+    size_t len = 0;
+    if (!_namespace.empty()) {
+        memcpy(fullNameBuf, _namespace.data(), _namespace.size());
+        len += _namespace.size();
+        fullNameBuf[len++] = ':';
+        fullNameBuf[len++] = ':';
+    }
+    memcpy(fullNameBuf + len, _name.data(), _name.size());
+    len += _name.size();
+    std::string_view fullName(fullNameBuf, len);
 
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
     {
@@ -157,7 +163,7 @@ IL2CPP::Il2CppClass *Internal::TryGetClassInImage(const IL2CPP::Il2CppImage *ima
             size_t typeCount = image->typeCount;
             for (size_t i = 0; i < typeCount; ++i) {
                 auto cls = il2cppMethods.il2cpp_image_get_class(image, i);
-                if (cls->declaringType || !cls->flags && strcmp(cls->name, BNM_OBFUSCATE("<Module>")) == 0) continue;
+                if (cls->declaringType || (!cls->flags && strcmp(cls->name, BNM_OBFUSCATE("<Module>")) == 0)) continue;
                 if (_namespace == cls->namespaze && _name == cls->name) {
                     result = cls;
                     break;
@@ -182,7 +188,7 @@ IL2CPP::Il2CppClass *Internal::TryGetClassInImage(const IL2CPP::Il2CppImage *ima
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
         std::unique_lock writeLock(Internal::cacheMutex);
 #endif
-        Internal::classCache[image][fullName] = result;
+        Internal::classCache[image][std::string(fullName)] = result;
     }
 
     return result;

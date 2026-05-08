@@ -3,6 +3,10 @@
 #include <cmath>
 #include "Vector3.hpp"
 
+#ifdef BNM_OMATH
+#include <omath/omath.hpp>
+#endif
+
 namespace BNM::Structures::Unity {
     struct Vector4;
 
@@ -16,6 +20,12 @@ namespace BNM::Structures::Unity {
         inline constexpr Vector4() = default;
         inline constexpr Vector4(float inX, float inY, float inZ, float inW) : x(inX), y(inY), z(inZ), w(inW) {}
         inline constexpr Vector4(Vector3 v, float inW) : x(v.x), y(v.y), z(v.z), w(inW) {}
+
+#ifdef BNM_OMATH
+        inline Vector4(const omath::Vector4<float>& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
+        inline operator omath::Vector4<float>() const { return {x, y, z, w}; }
+#endif
+
         inline Vector4(Color c);
 
         inline float* GetPtr() { return data; }

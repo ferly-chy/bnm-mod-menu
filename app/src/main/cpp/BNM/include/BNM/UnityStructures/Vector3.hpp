@@ -4,6 +4,10 @@
 #include <cmath>
 #include "Vector2.hpp"
 
+#ifdef BNM_OMATH
+#include <omath/omath.hpp>
+#endif
+
 namespace BNM::Structures::Unity {
     struct Quaternion;
 
@@ -14,6 +18,11 @@ namespace BNM::Structures::Unity {
         };
         inline constexpr Vector3() = default;
         inline constexpr Vector3(float x, float y, float z) : x(x), y(y), z(z) {};
+
+#ifdef BNM_OMATH
+        inline Vector3(const omath::Vector3<float>& v) : x(v.x), y(v.y), z(v.z) {}
+        inline operator omath::Vector3<float>() const { return {x, y, z}; }
+#endif
 
         operator Vector4() const;
         inline operator Vector2&() { return *(Vector2 *) this; }

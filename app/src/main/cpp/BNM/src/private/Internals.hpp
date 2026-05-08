@@ -32,6 +32,9 @@ namespace BNM::Internal {
         size_t operator()(std::string_view sv) const {
             return std::hash<std::string_view>{}(sv);
         }
+        size_t operator()(const std::string& s) const {
+            return std::hash<std::string>{}(s);
+        }
     };
 
 #pragma pack(push, 1)
@@ -105,13 +108,15 @@ namespace BNM::Internal {
     extern int32_t finalizerSlot;
 
     // Cache for images, classes and methods
-    typedef std::unordered_map<std::string, IL2CPP::Il2CppImage*> ImageCacheMap;
-    typedef std::unordered_map<const IL2CPP::Il2CppImage*, std::unordered_map<std::string, IL2CPP::Il2CppClass*>> ClassCacheMap;
-    typedef std::unordered_map<const IL2CPP::Il2CppClass*, std::unordered_map<std::string, IL2CPP::MethodInfo*>> MethodCacheMap;
+    typedef std::unordered_map<std::string, IL2CPP::Il2CppImage*, StringViewHash, std::equal_to<>> ImageCacheMap;
+    typedef std::unordered_map<const IL2CPP::Il2CppImage*, std::unordered_map<std::string, IL2CPP::Il2CppClass*, StringViewHash, std::equal_to<>>> ClassCacheMap;
+    typedef std::unordered_map<const IL2CPP::Il2CppClass*, std::unordered_map<std::string, IL2CPP::MethodInfo*, StringViewHash, std::equal_to<>>> MethodCacheMap;
+    typedef std::unordered_map<std::string, IL2CPP::Il2CppClass*, StringViewHash, std::equal_to<>> GlobalClassCacheMap;
 
     extern ImageCacheMap imageCache;
     extern ClassCacheMap classCache;
     extern MethodCacheMap methodCache;
+    extern GlobalClassCacheMap globalClassCache;
 
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
     extern std::shared_mutex cacheMutex;

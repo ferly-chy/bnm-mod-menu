@@ -553,8 +553,11 @@ namespace BNM::Structures::Mono {
             @param n Number of additional elements
         */
         void GrowIfNeeded(int n) {
-            if (size + n > items->capacity)
-                Resize(size + n);
+            if (size + n > items->capacity) {
+                int newCapacity = items->capacity == 0 ? 4 : items->capacity * 2;
+                while (newCapacity < size + n) newCapacity *= 2;
+                Resize(newCapacity);
+            }
         }
 
         /**

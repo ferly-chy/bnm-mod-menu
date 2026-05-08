@@ -1,30 +1,136 @@
-## ByNameModding
-#### English | [Русский](https://github.com/ByNameModding/BNM-Android/blob/master/README_RU.md)
-ByNameModding is a library for modding of il2cpp games by classes, methods, field names. It includes everything you need for Android Unity games modding.<br>
-Requires C++20 minimum.
+# ByNameModding (BNM) - Android IL2CPP Modding Framework
 
-## Recent Architectural Refactor (April 2026)
-This version includes a major architectural overhaul focusing on stability, thread-safety, and modern C++ standards:
-- **Robust ARM64 Scanning**: Replaced manual byte scanning with a formal ARM64 instruction decoder for reliable symbol resolution.
-- **Thread-Safe Metadata**: Implemented atomic patching and memory barriers for vtables and method arrays.
-- **Memory Safety**: Introduced RAII-based metadata management and thread-local trackers to prevent leaks.
-- **Modern Access**: Added `std::span` support for high-performance, bounds-checked metadata access.
+ByNameModding (BNM) is a powerful, high-performance, and modern C++20 library designed for modding Android games built with the Unity engine (IL2CPP). 
 
-## ⚠️ Stability & Crash Notes
-While this version significantly improves reliability, please note:
-- **Runtime Modification**: Modifying classes already in use by the Unity engine remains the most common cause of crashes. Always prefer modifying classes during early initialization.
-- **Binary Obfuscation**: Highly protected or obfuscated binaries may still break the symbol scanning logic if standard instruction patterns (ADRP+ADD/LDR) are disrupted.
-- **GC Integrity**: Ensure your custom `Finalize` methods call the base finalizer to prevent memory leaks, despite improvements in BNM's finalizer inheritance.
+Unlike traditional modding that relies on brittle memory offsets, BNM uses **Symbolic Modding**, allowing you to interact with game internals using class, method, and field names. This makes your mods stable across game updates and much easier to write and maintain.
 
-## Getting Started
-See documentation on [ByNameModding.github.io](https://bynamemodding.github.io/).
+## 🚀 Key Features
+*   **Symbolic Resolution**: No more memory offsets! Use names like `Class("UnityEngine", "GameObject")`.
+*   **High Performance**: Zero-allocation caching, Global Class Index, and Pool Allocators for extreme speed.
+*   **Modern C++20 API**: Clean, type-safe syntax with universal invokers and RAII-based resource management.
+*   **Unity 6 Support**: Full compatibility with the latest IL2CPP Metadata Version 39 (Unity 6000.x+).
+*   **Runtime Class Management**: Create and modify C# classes directly from C++ at runtime.
+*   **Coroutine Integration**: Seamlessly bridge C++20 coroutines with Unity's `IEnumerator`.
+*   **Thread Safety**: Robust multi-threading support with automatic thread attachment and memory fences.
 
-## Supported Unity versions: 5.6.4f1, 2017.x - 6000.0.x
+---
 
-## Dependencies
-[UTF8-CPP](https://github.com/nemtrif/utfcpp) used by il2cpp and by BNM too.<br>
-[Open-hierarchy custom RTTI](https://github.com/royvandam/rtti/tree/cf0dee6fb3999573f45b0726a8d5739022e3dacf) used to optimize memory usage
-### Android hookinng software for example:
-[Dobby](https://github.com/ferly-chy/dobby) recommended<br>
-[ShadowHook](https://github.com/bytedance/android-inline-hook)<br>
-[Substrate](https://github.com/jbro129/Unity-Substrate-Hook-Android/tree/master/C%2B%2B/Substrate) with [And64InlineHook](https://github.com/Rprop/And64InlineHook) - do not support unhook
+## 🛠️ Setup & Configuration
+
+### 1. Build Prerequisites
+*   **Android NDK**: Version supporting C++20 (r21e+ recommended).
+*   **Hooking Backend**: BNM requires a hooking library. Recommended: [Dobby](https://github.com/ferly-chy/dobby) or [ShadowHook](https://github.com/bytedance/android-inline-hook).
+
+### 2. Configuration
+Edit `include/BNM/UserSettings/GlobalSettings.hpp`:
+*   **Unity Version**: `#define UNITY_VER 233` (For Unity 6/6000.x+) or corresponding version.
+*   **Hooking Library**: Uncomment `#define BNM_USE_DOBBY` or `#define BNM_USE_SHADOWHOOK`.
+
+### 3. Initialization (JNI_OnLoad)
+Initialize BNM in your library's entry point:
+
+```cpp
+#include <BNM/Loading.hpp>
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    JNIEnv *env;
+    vm->GetEnv((void **) &env, JNI_VERSION_1_6);
+
+    // 1. Load BNM
+    BNM::Loading::TryLoadByJNI(env);
+
+    // 2. Register your mod logic
+    BNM::Loading::AddOnLoadedEvent([]() {
+        BNM_LOG_INFO("BNM is ready!");
+        // Your initialization code here
+    });
+
+    return JNI_VERSION_1_6;
+}
+```
+
+---
+
+## 📖 Usage Guide
+
+### Using Helpers (Fastest Way)
+Include `#include <BNM/Helpers.hpp>` for high-level macros:
+
+```cpp
+// Fast Class & Method lookup
+auto myClass = BNM_CLASS("UnityEngine", "GameObject");
+auto setActive = BNM_METHOD(myClass, "SetActive", 1);
+
+// Fast Hooking
+void (*old_Update)(void*);
+void my_Update(void* instance) {
+    old_Update(instance);
+}
+BNM_HOOK(BNM_CLASS("UnityEngine", "MonoBehaviour"), "Update", my_Update, old_Update);
+
+// Fast Thread Attachment (for non-game threads)
+void MyThread() {
+    BNM_ATTACH_THREAD();
+    // Use BNM safely here...
+}
+```
+
+### Core API (Modern Syntax)
+
+#### Classes & Objects
+```cpp
+using namespace BNM;
+
+Class playerClass("UnityEngine", "Player");
+auto playerInstance = playerClass.CreateNewInstance();
+```
+
+#### Methods (Universal Invoker)
+```cpp
+// Call any method directly with .Invoke<ReturnType>(args...)
+auto getHealth = playerClass.GetMethod("GetHealth");
+float health = getHealth[playerInstance].Invoke<float>();
+
+// Call static method
+auto physics = Class("UnityEngine", "Physics");
+Vector3 gravity = physics.GetMethod("get_gravity").Invoke<Vector3>();
+```
+
+#### Fields & Properties
+```cpp
+// Type-safe Get/Set
+auto healthField = playerClass.GetField("_health");
+healthField[playerInstance].SetValue<float>(100.0f);
+float val = healthField[playerInstance].GetValue<float>();
+
+auto nameProp = playerClass.GetProperty("Name");
+nameProp[playerInstance].SetValue<Structures::Mono::String*>(BNM::CreateMonoString("Hero"));
+```
+
+---
+
+## 🏗️ Classes Management (Advanced)
+BNM allows creating **New C# Classes** from C++:
+
+```cpp
+class MyComponent : public BNM::UnityEngine::MonoBehaviour {
+    BNM_CustomClass(MyComponent, BNM::CompileTimeClassBuilder("MyMod", "SuperComponent"), Defaults::Get<UnityEngine::MonoBehaviour>(), nullptr);
+
+    int score;
+    BNM_CustomField(score, Defaults::Get<int>(), "score");
+
+    void Start() { BNM_LOG_INFO("Component Started!"); }
+    BNM_CustomMethod(Start, false, Defaults::Get<void>(), "Start");
+};
+```
+
+---
+
+## ⚠️ Stability & Performance Notes
+*   **Memory Management**: BNM uses a high-performance **Metadata Pool Allocator** to prevent fragmentation.
+*   **Caching**: All lookups are cached globally ($O(1)$) using zero-allocation transparent hashing.
+*   **Thread Safety**: Always use `BNM_ATTACH_THREAD()` if accessing BNM/IL2CPP from a thread not created by Unity.
+*   **Validity**: Always check if a Unity object is still "alive" using `obj->Alive()`.
+
+---
+*Generated for BNM Version 2.6.0 with Unity 6 Support*

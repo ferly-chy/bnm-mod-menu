@@ -26,11 +26,36 @@ Class::Class(const MonoType *type) {
 Class::Class(const CompileTimeClass &compileTimeClass) { _data = compileTimeClass; }
 
 static IL2CPP::Il2CppClass *TryGetClassWithoutImage(const std::string_view &_namespace, const std::string_view &_name) {
+    std::string fullName;
+    fullName.reserve(_namespace.size() + _name.size() + 3);
+    if (!_namespace.empty()) {
+        fullName += _namespace;
+        fullName += "::";
+    }
+    fullName += _name;
+
+#ifdef BNM_ALLOW_MULTI_THREADING_SYNC
+    {
+        std::shared_lock lock(Internal::cacheMutex);
+        if (auto it = Internal::globalClassCache.find(fullName); it != Internal::globalClassCache.end())
+            return it->second;
+    }
+#else
+    if (auto it = Internal::globalClassCache.find(fullName); it != Internal::globalClassCache.end())
+        return it->second;
+#endif
+
     auto &assemblies = *Internal::il2cppMethods.Assembly$$GetAllAssemblies();
 
     for (auto assembly : assemblies) {
         auto image = Internal::il2cppMethods.il2cpp_assembly_get_image(assembly);
-        if (auto _data = Internal::TryGetClassInImage(image, _namespace, _name); _data) return _data;
+        if (auto _data = Internal::TryGetClassInImage(image, _namespace, _name); _data) {
+#ifdef BNM_ALLOW_MULTI_THREADING_SYNC
+            std::unique_lock writeLock(Internal::cacheMutex);
+#endif
+            Internal::globalClassCache[fullName] = _data;
+            return _data;
+        }
     }
 
     return nullptr;
@@ -183,9 +208,9 @@ MethodBase Class::GetMethod(const std::string_view &name, int parameters) const 
     TryInit();
 
     std::string fullName;
-    fullName.reserve(name.size() + 10);
+    fullName.reserve(name.size() + 12);
     fullName += name;
-    fullName += "#";
+    fullName += '#';
     fullName += std::to_string(parameters);
 
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC

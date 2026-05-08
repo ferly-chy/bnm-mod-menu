@@ -1,7 +1,5 @@
-#pragma once
-#include <cassert>
-#if __cplusplus < 202002L
-static_assert(false, "ByNameModding requires C++20 and above!");
+#if __cplusplus < 202302L
+static_assert(false, "ByNameModding requires C++23 and above!");
 #endif
 
 // Pointer size validation
@@ -10,6 +8,8 @@ static_assert(sizeof(void*) == 8, "BNM: Compilation for 64-bit architecture dete
 #else
 static_assert(sizeof(void*) == 4, "BNM: Compilation for 32-bit architecture detected, but pointer size is not 4 bytes!");
 #endif
+
+#pragma once
 
 //#define UNITY_VER 56 // 5.6.4f1
 //#define UNITY_VER 171 // 2017.1.x
@@ -93,6 +93,10 @@ static_assert(false, "BNM: For Unity 2021.1.x, you must define UNITY_PATCH_VER i
 //! Periksa kelas saat menyetel instance ke field dan metode
 #define BNM_CHECK_INSTANCE_TYPE
 
+//! Enable omath integration
+//! Aktifkan integrasi omath
+#define BNM_OMATH
+
 #define BNM_DEBUG
 
 #define BNM_INFO
@@ -112,29 +116,12 @@ static_assert(false, "BNM: For Unity 2021.1.x, you must define UNITY_PATCH_VER i
 //! Data yang dikaburkan menggunakan makro ini dapat dibebaskan setelah BNM dimuat. Hanya untuk pengguna tingkat lanjut! Jika Anda tidak tahu apa dan bagaimana, gunakan saja makro dasar Anda di sini.
 #define BNM_OBFUSCATE_TMP(str) str // const char *
 
-// Shadowhook
-/*
-template<typename PTR_T, typename NEW_T, typename T_OLD>
-inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &oldBytes) {
-    if ((void *) ptr != nullptr) return shadowhook_hook_func_addr((void *)ptr, (void *) newMethod, (void **) &oldBytes);
-    return nullptr;
-}
+//! Choose your hooking software by uncommenting ONE of the following:
+//! Pilih perangkat lunak hooking Anda dengan menghapus komentar pada SALAH SATU dari berikut ini:
+#define BNM_USE_DOBBY
+// #define BNM_USE_SHADOWHOOK
 
-template<typename PTR_T, typename NEW_T, typename T_OLD>
-inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &&oldBytes) {
-    if ((void *) ptr != nullptr) return shadowhook_hook_func_addr((void *)ptr, (void *) newMethod, (void **) &oldBytes);
-    return nullptr;
-}
-
-template<typename PTR_T>
-inline void Unhook(PTR_T ptr) {
-    if ((void *) ptr != nullptr) shadowhook_unhook((void *)ptr);
-}
-*/
-
-
-
-// Dobby
+#if defined(BNM_USE_DOBBY)
 #include <dobby.h>
 
 template<typename PTR_T, typename NEW_T, typename T_OLD>
@@ -153,33 +140,44 @@ template<typename PTR_T>
 inline void Unhook(PTR_T ptr) {
     if ((void *) ptr != nullptr) DobbyDestroy((void *)ptr);
 }
-
-
-
-// Dummy
-/*
-static_assert(false, "No hooking software!");
+#elif defined(BNM_USE_SHADOWHOOK)
+#include <shadowhook.h>
 
 template<typename PTR_T, typename NEW_T, typename T_OLD>
 inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &oldBytes) {
-    if ((void *) ptr != nullptr) ((void)0);
+    if ((void *) ptr != nullptr) return shadowhook_hook_func_addr((void *)ptr, (void *) newMethod, (void **) &oldBytes);
     return nullptr;
 }
 
 template<typename PTR_T, typename NEW_T, typename T_OLD>
 inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &&oldBytes) {
-    if ((void *) ptr != nullptr) ((void)0);
+    if ((void *) ptr != nullptr) return shadowhook_hook_func_addr((void *)ptr, (void *) newMethod, (void **) &oldBytes);
     return nullptr;
 }
 
 template<typename PTR_T>
 inline void Unhook(PTR_T ptr) {
-    if ((void *) ptr != nullptr) ((void)0);
+    if ((void *) ptr != nullptr) shadowhook_unhook((void *)ptr);
 }
-*/
+#else
+// Dummy / Fallback
+template<typename PTR_T, typename NEW_T, typename T_OLD>
+inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &oldBytes) {
+    return nullptr;
+}
 
+template<typename PTR_T, typename NEW_T, typename T_OLD>
+inline void *BasicHook(PTR_T ptr, NEW_T newMethod, T_OLD &&oldBytes) {
+    return nullptr;
+}
+
+template<typename PTR_T>
+inline void Unhook(PTR_T ptr) {
+}
+#endif
 
 #include <dlfcn.h>
+
 // If you need to hide dlfcn calls or use your dl to load BNM in the game from the outside
 // Jika Anda perlu menyembunyikan panggilan dlfcn atau menggunakan dl Anda untuk memuat BNM di game dari luar
 #define BNM_dlopen dlopen
@@ -194,7 +192,8 @@ inline void Unhook(PTR_T ptr) {
 #define BNM_malloc malloc
 #define BNM_free free
 
-#include <android/log.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/bundled/printf.h>
 
 #define BNM_TAG "ByNameModding"
 
@@ -205,30 +204,30 @@ inline void Unhook(PTR_T ptr) {
 #endif
 
 #ifdef BNM_INFO
-#define BNM_LOG_INFO(...) ((void)__android_log_print(4, BNM_TAG, __VA_ARGS__))
+#define BNM_LOG_INFO(...) spdlog::info("{}", fmt::sprintf(__VA_ARGS__))
 #else
 #define BNM_LOG_INFO(...) ((void)0)
 #endif
 
 #ifdef BNM_DEBUG
-#define BNM_LOG_DEBUG(...) ((void)__android_log_print(3, BNM_TAG, __VA_ARGS__))
-#define BNM_LOG_DEBUG_IF(condition, ...) if (condition) ((void)__android_log_print(3, BNM_TAG, __VA_ARGS__))
+#define BNM_LOG_DEBUG(...) spdlog::debug("{}", fmt::sprintf(__VA_ARGS__))
+#define BNM_LOG_DEBUG_IF(condition, ...) if (condition) spdlog::debug("{}", fmt::sprintf(__VA_ARGS__))
 #else
 #define BNM_LOG_DEBUG(...) ((void)0)
 #define BNM_LOG_DEBUG_IF(...) ((void)0)
 #endif
 
 #ifdef BNM_ERROR
-#define BNM_LOG_ERR(...) ((void)__android_log_print(6, BNM_TAG, __VA_ARGS__))
-#define BNM_LOG_ERR_IF(condition, ...) if (condition) ((void)__android_log_print(6, BNM_TAG, __VA_ARGS__))
+#define BNM_LOG_ERR(...) spdlog::error("{}", fmt::sprintf(__VA_ARGS__))
+#define BNM_LOG_ERR_IF(condition, ...) if (condition) spdlog::error("{}", fmt::sprintf(__VA_ARGS__))
 #else
 #define BNM_LOG_ERR(...) ((void)0)
 #define BNM_LOG_ERR_IF(condition, ...) ((void)0)
 #endif
 
 #ifdef BNM_WARNING
-#define BNM_LOG_WARN(...) ((void)__android_log_print(5, BNM_TAG, __VA_ARGS__))
-#define BNM_LOG_WARN_IF(condition, ...) if (condition) ((void)__android_log_print(5, BNM_TAG, __VA_ARGS__))
+#define BNM_LOG_WARN(...) spdlog::warn("{}", fmt::sprintf(__VA_ARGS__))
+#define BNM_LOG_WARN_IF(condition, ...) if (condition) spdlog::warn("{}", fmt::sprintf(__VA_ARGS__))
 #else
 #define BNM_LOG_WARN(...) ((void)0)
 #define BNM_LOG_WARN_IF(condition, ...) ((void)0)
@@ -244,4 +243,4 @@ namespace BNM {
 #endif
 }
 
-#define BNM_VER "2.5.3"
+#define BNM_VER "2.6.0"

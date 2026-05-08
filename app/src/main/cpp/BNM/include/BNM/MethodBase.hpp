@@ -29,6 +29,12 @@ namespace BNM {
         inline MethodBase(const MethodBase &other) = default;
 
         /**
+            @brief Copy method.
+            @param other Other method
+        */
+        inline MethodBase &operator=(const MethodBase &other) = default;
+
+        /**
             @brief Create method from il2cpp method.
             @param info Il2cpp method
         */
@@ -134,6 +140,18 @@ namespace BNM {
            @brief Cast method to be able to call it.
         */
         template<typename NewType> inline Method<NewType> &cast() const { return (Method<NewType> &)*this; }
+
+        /**
+         * @brief Modern and easy way to call the method.
+         * @tparam Ret Return type (default is void)
+         * @tparam Args Argument types
+         * @param args Arguments
+         * @return Result of the call
+         */
+        template<typename Ret = void, typename ...Args>
+        inline Ret Invoke(Args... args) const {
+            return ((Method<Ret>*)this)->Call(args...);
+        }
 
         IL2CPP::MethodInfo *_data{};
         IL2CPP::Il2CppObject *_instance{};

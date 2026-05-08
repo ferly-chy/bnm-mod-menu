@@ -1,0 +1,816 @@
+name: Omath CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+##############################################################################
+# 1)  Linux  –  Clang / Ninja
+##############################################################################
+jobs:
+  linux-build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: Linux (Clang) (x64-linux)
+            triplet: x64-linux
+            runner: ubuntu-latest
+            preset: linux-release-vcpkg
+            coverage: true
+            install_cmd: |
+              wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+              sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+              sudo apt-get update
+              sudo apt-get install -y git build-essential cmake ninja-build \
+                     zip unzip curl pkg-config ca-certificates \
+                     clang-21 lld-21 libc++-21-dev libc++abi-21-dev \
+                     llvm-21
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-21 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-21 100
+              sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+          - name: Linux (Clang) (x86-linux)
+            triplet: x86-linux
+            runner: ubuntu-latest
+            preset: linux-release-vcpkg-x86
+            coverage: false
+            install_cmd: |
+              # Add LLVM 21 repository
+              wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+              sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+              # Add GCC Toolchain PPA
+              sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu plucky main universe"
+              # Enable i386 architecture
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              # Install Clang 21
+              sudo apt-get install -y git build-essential cmake ninja-build \
+                     zip unzip curl pkg-config ca-certificates \
+                     clang-21 lld-21 libc++-21-dev libc++abi-21-dev
+              sudo apt-get install -y -t plucky binutils
+              # Install GCC 15 with multilib support
+              sudo apt-get install -y gcc-15-multilib g++-15-multilib
+              # Set up alternatives for Clang
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-21 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-21 100
+              sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+              # Set up alternatives for GCC
+              sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+              sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+          - name: Linux (Clang) (arm64-linux)
+            triplet: arm64-linux
+            runner: ubuntu-24.04-arm
+            preset: linux-release-vcpkg-arm64
+            coverage: false
+            install_cmd: |
+              wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+              sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+              sudo apt-get update
+              sudo apt-get install -y git build-essential cmake ninja-build \
+                     zip unzip curl pkg-config ca-certificates \
+                     clang-21 lld-21 libc++-21-dev libc++abi-21-dev
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-21 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-21 100
+              sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Install basic tool-chain
+        shell: bash
+        run: ${{ matrix.install_cmd }}
+
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_INSTALL_OPTIONS="--allow-unsupported" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DOMATH_ENABLE_COVERAGE=${{ matrix.coverage == true && 'ON' || 'OFF' }} \
+            -DVCPKG_MANIFEST_FEATURES="imgui;avx2;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Run unit_tests
+        shell: bash
+        run: ./out/Release/unit_tests
+
+      - name: Run Coverage
+        if: ${{ matrix.coverage == true }}
+        shell: bash
+        run: |
+          sudo apt-get install lcov
+          chmod +x scripts/coverage-llvm.sh
+          ./scripts/coverage-llvm.sh \
+            "${{ github.workspace }}" \
+            "cmake-build/build/${{ matrix.preset }}" \
+            "./out/Release/unit_tests" \
+            "cmake-build/build/${{ matrix.preset }}/coverage"
+
+      - name: Upload Coverage Report
+        if: ${{ matrix.coverage == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: cmake-build/build/${{ matrix.preset }}/coverage/
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+##############################################################################
+# 2)  Windows  –  MSVC / Ninja
+##############################################################################
+  windows-build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: Windows (MSVC) (x64-windows)
+            runner: windows-latest
+            arch: amd64
+            preset: windows-release-vcpkg
+            triplet: x64-windows
+          - name: Windows (MSVC) (x86-windows)
+            runner: windows-latest
+            arch: amd64_x86
+            preset: windows-release-vcpkg-x86
+            triplet: x86-windows
+          - name: Windows (MSVC) (arm64-windows)
+            runner: windows-11-arm
+            arch: arm64
+            preset: windows-release-vcpkg-arm64
+            triplet: arm64-windows
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Set up MSVC developer command-prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DOMATH_ENABLE_COVERAGE=OFF \
+            -DVCPKG_MANIFEST_FEATURES="imgui;avx2;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Run unit_tests.exe
+        shell: bash
+        run: ./out/Release/unit_tests.exe
+
+      ##########################################################################
+      # Coverage (x64-windows only)
+      ##########################################################################
+      - name: Install LLVM
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        run: |
+          choco install llvm -y
+
+      - name: Clean Build Directory for Coverage
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        shell: pwsh
+        run: |
+          $buildDir = "cmake-build/build/${{ matrix.preset }}"
+          if (Test-Path $buildDir) {
+            Write-Host "Cleaning build directory to prevent compiler conflict: $buildDir"
+            Remove-Item -Path $buildDir -Recurse -Force
+          }
+
+      - name: Build Debug for Coverage
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DCMAKE_C_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" \
+            -DCMAKE_CXX_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" \
+            -DCMAKE_LINKER="C:/Program Files/LLVM/bin/lld-link.exe" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DOMATH_ENABLE_COVERAGE=ON \
+            -DOMATH_THREAT_WARNING_AS_ERROR=OFF \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DVCPKG_MANIFEST_FEATURES="imgui;avx2;tests;lua"
+          cmake --build cmake-build/build/${{ matrix.preset }} --config Debug --target unit_tests omath
+
+      - name: Run Tests (Generates .profraw)
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        shell: pwsh
+        env:
+          LLVM_PROFILE_FILE: "cmake-build/build/${{ matrix.preset }}/unit_tests.profraw"
+        run: |
+          ./out/Debug/unit_tests.exe
+
+      - name: Process Coverage (llvm-profdata & llvm-cov)
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        shell: pwsh
+        run: |
+          $BUILD_DIR = "cmake-build/build/${{ matrix.preset }}"
+          $EXE_PATH = "./out/Debug/unit_tests.exe"
+          
+          # 1. Merge raw profile data (essential step)
+          & "C:/Program Files/LLVM/bin/llvm-profdata.exe" merge `
+            -sparse "$BUILD_DIR/unit_tests.profraw" `
+            -o "$BUILD_DIR/unit_tests.profdata"
+
+          # 2. Export to LCOV format
+          #    NOTE: We explicitly ignore vcpkg_installed and system headers
+          & "C:/Program Files/LLVM/bin/llvm-cov.exe" export "$EXE_PATH" `
+            -instr-profile="$BUILD_DIR/unit_tests.profdata" `
+            -format=lcov `
+            -ignore-filename-regex="vcpkg_installed|external|tests" `
+            > "$BUILD_DIR/lcov.info"
+
+          if (Test-Path "$BUILD_DIR/lcov.info") {
+            Write-Host "✅ LCOV info created at $BUILD_DIR/lcov.info"
+          } else {
+            Write-Error "Failed to create LCOV info"
+            exit 1
+          }
+
+      - name: Install LCOV (for genhtml)
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        run: choco install lcov -y
+
+      - name: Generate HTML Report
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        shell: bash
+        run: |
+          BUILD_DIR="cmake-build/build/${{ matrix.preset }}"
+          LCOV_INFO="${BUILD_DIR}/lcov.info"
+          HTML_DIR="${BUILD_DIR}/coverage-html"
+
+          # Fix paths for genhtml (Perl hates backslashes)
+          sed -i 's|\\|/|g' "${LCOV_INFO}"
+          
+          # Locate genhtml provided by 'choco install lcov'
+          # It is typically in ProgramData/chocolatey/lib/lcov/tools/bin
+          GENHTML=$(find /c/ProgramData/chocolatey -name genhtml -print -quit)
+          
+          if [ -z "$GENHTML" ]; then
+            echo "Error: genhtml executable not found"
+            exit 1
+          fi
+          
+          echo "Using genhtml: $GENHTML"
+          mkdir -p "$HTML_DIR"
+          
+          # Run genhtml
+          # Added --demangle-cpp if your version supports it, otherwise remove it
+          perl "$GENHTML" \
+            "${LCOV_INFO}" \
+            --output-directory "$HTML_DIR" \
+            --title "OMath Coverage Report" \
+            --legend \
+            --show-details \
+            --branch-coverage \
+            --ignore-errors source
+            
+          echo "✅ LCOV HTML report generated at $HTML_DIR"
+
+      - name: Upload Coverage (HTML Report)
+        if: ${{ matrix.triplet == 'x64-windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-windows
+          path: cmake-build/build/${{ matrix.preset }}/coverage-html/
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+  ##############################################################################
+  # 3)  macOS  –  AppleClang / Ninja
+  ##############################################################################
+  macosx-build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: macOS (AppleClang) (arm64-osx)
+            runner: macos-latest
+            preset: darwin-release-vcpkg
+            triplet: arm64-osx
+            coverage: true
+          - name: macOS (AppleClang) (x64-osx)
+            runner: macos-15-intel
+            preset: darwin-release-vcpkg-x64
+            triplet: x64-osx
+            coverage: false
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Install basic tool-chain with Homebrew
+        shell: bash
+        run: |
+          brew install cmake ninja
+
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DCMAKE_C_COMPILER=$(xcrun --find clang) \
+            -DCMAKE_CXX_COMPILER=$(xcrun --find clang++) \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DOMATH_ENABLE_COVERAGE=${{ matrix.coverage == true && 'ON' || 'OFF' }} \
+            -DVCPKG_MANIFEST_FEATURES="imgui;avx2;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Run unit_tests
+        if: ${{ matrix.coverage != true }}
+        shell: bash
+        run: ./out/Release/unit_tests
+
+      - name: Run Coverage
+        if: ${{ matrix.coverage == true }}
+        shell: bash
+        run: |
+          brew install lcov
+          chmod +x scripts/coverage-llvm.sh
+          ./scripts/coverage-llvm.sh \
+            "${{ github.workspace }}" \
+            "cmake-build/build/${{ matrix.preset }}" \
+            "./out/Release/unit_tests" \
+            "cmake-build/build/${{ matrix.preset }}/coverage"
+
+      - name: Upload Coverage Report
+        if: ${{ matrix.coverage == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-macos
+          path: cmake-build/build/${{ matrix.preset }}/coverage/
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+  ##############################################################################
+  # 4)  iOS  –  AppleClang / Xcode / arm64-ios
+  ##############################################################################
+  ios-build:
+    name: iOS (AppleClang) (${{ matrix.triplet }})
+    runs-on: macOS-latest
+    strategy:
+      matrix:
+        include:
+          - triplet: arm64-ios
+            preset: ios-release-vcpkg
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Install CMake tooling
+        shell: bash
+        run: |
+          brew install cmake ninja
+
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_INSTALL_OPTIONS="--allow-unsupported" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DVCPKG_MANIFEST_FEATURES="imgui;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: |
+          cmake --build cmake-build/build/${{ matrix.preset }} --config Release --target unit_tests omath
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+  ##############################################################################
+  # 5)  FreeBSD  –  Clang / Ninja
+  ##############################################################################
+  freebsd-build-and-test:
+    name: FreeBSD (Clang) (${{ matrix.triplet }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - triplet: x64-freebsd
+            preset: freebsd-release-vcpkg
+            arch: x86-64
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/tmp/vcpkg
+    steps:
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build and Test
+        uses: cross-platform-actions/action@v0.31.0
+        with:
+          operating_system: freebsd
+          architecture: ${{ matrix.arch }}
+          version: '15.0'
+          memory: '12G'
+          cpu_count: 4
+          run: |
+            sudo pkg install -y git curl zip unzip gmake llvm gsed bash perl5 openssl 7-zip coreutils cmake ninja pkgconf patchelf
+            git config --global --add safe.directory `pwd`
+            # Build vcpkg in /tmp to avoid sshfs timestamp sync issues
+            export VCPKG_ROOT=/tmp/vcpkg
+            rm -rf "$VCPKG_ROOT"
+            git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+            cd "$VCPKG_ROOT"
+            ./bootstrap-vcpkg.sh
+            cd -
+            export VCPKG_FORCE_SYSTEM_BINARIES=0
+            cmake --preset ${{ matrix.preset }} \
+              -DOMATH_BUILD_TESTS=ON \
+              -DOMATH_BUILD_BENCHMARK=OFF \
+              -DVCPKG_MANIFEST_FEATURES="imgui;avx2;tests;lua" \
+              -DVCPKG_INSTALL_OPTIONS="--allow-unsupported"
+            cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+            ./out/Release/unit_tests
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+  ##############################################################################
+  # 6)  Android NDK  –  Clang / Ninja
+  ##############################################################################
+  android-build:
+    name: Android NDK (${{ matrix.triplet }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - triplet: arm-neon-android
+            preset: android-arm-neon-release-vcpkg
+          - triplet: arm64-android
+            preset: android-arm64-release-vcpkg
+          - triplet: x64-android
+            preset: android-x64-release-vcpkg
+          - triplet: x86-android
+            preset: android-x86-release-vcpkg
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
+    steps:
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          NDK_VERSION="r28b"
+          NDK_ZIP="android-ndk-${NDK_VERSION}-linux.zip"
+          wget -q "https://dl.google.com/android/repository/${NDK_ZIP}"
+          unzip -q "${NDK_ZIP}" -d "${{ github.workspace }}"
+          mv "${{ github.workspace }}/android-ndk-${NDK_VERSION}" "$ANDROID_NDK_HOME"
+          rm "${NDK_ZIP}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
+
+      - name: Install basic tool-chain
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_INSTALL_OPTIONS="--allow-unsupported" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DVCPKG_MANIFEST_FEATURES="imgui;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: |
+          cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+  ##############################################################################
+  # 7)  WebAssembly (Emscripten)  –  Clang / Ninja / wasm32-emscripten
+  ##############################################################################
+  wasm-build-and-test:
+    name: WebAssembly (Emscripten) (${{ matrix.triplet }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - triplet: wasm32-emscripten
+            preset: wasm-release-vcpkg
+      fail-fast: false
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install basic tool-chain
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 'latest'
+
+      - name: Verify Emscripten
+        shell: bash
+        run: |
+          echo "EMSDK=$EMSDK"
+          emcc --version
+          # Verify toolchain file exists
+          ls -la "$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_INSTALL_OPTIONS="--allow-unsupported" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DVCPKG_MANIFEST_FEATURES="imgui;tests;lua"
+
+      - name: Build
+        shell: bash
+        run: |
+          cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build-logs-${{ matrix.triplet }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run WASM Unit Tests
+        run: node out/Release/unit_tests.js
+
+  ##############################################################################
+  # 8)  Windows MSYS2 MinGW  –  GCC / Ninja
+  ##############################################################################
+  mingw-build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - name: MINGW64 (MSYS2) (x64-mingw-dynamic)
+            msystem: MINGW64
+            pkg_prefix: mingw-w64-x86_64
+            preset: mingw-release-vcpkg
+          - name: UCRT64 (MSYS2) (x64-mingw-dynamic)
+            msystem: UCRT64
+            pkg_prefix: mingw-w64-ucrt-x86_64
+            preset: mingw-release-vcpkg
+          - name: MINGW32 (MSYS2) (x86-mingw-dynamic)
+            msystem: MINGW32
+            pkg_prefix: mingw-w64-i686
+            preset: mingw32-release-vcpkg
+      fail-fast: false
+    
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    
+    steps:
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            ${{ matrix.pkg_prefix }}-toolchain
+            ${{ matrix.pkg_prefix }}-cmake
+            ${{ matrix.pkg_prefix }}-ninja
+            ${{ matrix.pkg_prefix }}-pkg-config
+            git
+            base-devel
+
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_INSTALL_OPTIONS="--allow-unsupported" \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=OFF \
+            -DVCPKG_MANIFEST_FEATURES="imgui;tests;lua"
+
+      - name: Build
+        run: |
+          cmake --build cmake-build/build/${{ matrix.preset }} --target unit_tests omath
+
+      - name: Run unit_tests.exe
+        run: |
+          ./out/Release/unit_tests.exe
+
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mingw-build-logs-${{ matrix.msystem }}
+          path: |
+            cmake-build/build/${{ matrix.preset }}/**/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+
+
+  ##############################################################################
+  # 9)  Valgrind Memory Check
+  ##############################################################################
+  valgrind-memory-check:
+    name: Valgrind Analysis (All Targets)
+    runs-on: ubuntu-latest
+    needs: [linux-build-and-test]
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    steps:
+      - name: Install toolchain
+        shell: bash
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+          sudo apt-get update
+          sudo apt-get install -y git build-essential cmake ninja-build \
+            zip unzip curl pkg-config ca-certificates \
+            clang-21 lld-21 libc++-21-dev libc++abi-21-dev \
+            llvm-21 valgrind libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-21 100
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-21 100
+          sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+
+      - name: Checkout repository (with sub-modules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          ./bootstrap-vcpkg.sh
+
+      - name: Configure (cmake --preset)
+        shell: bash
+        run: |
+          cmake --preset linux-release-vcpkg \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DOMATH_BUILD_EXAMPLES=OFF \
+            -DOMATH_BUILD_TESTS=ON \
+            -DOMATH_BUILD_BENCHMARK=ON \
+            -DOMATH_ENABLE_VALGRIND=ON \
+            -DVCPKG_MANIFEST_FEATURES="imgui;avx2;lua;tests;benchmark"
+
+      - name: Build All Targets
+        shell: bash
+        run: cmake --build cmake-build/build/linux-release-vcpkg
+
+      - name: Run Valgrind (All Registered Targets)
+        shell: bash
+        working-directory: cmake-build/build/linux-release-vcpkg
+        run: |
+          cmake --build . --target valgrind_all

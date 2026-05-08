@@ -37,6 +37,8 @@ namespace BNM {
 #include "Il2CppHeaders/2022.1.h"
 #elif UNITY_VER >= 222 && UNITY_VER <= 223
 #include "Il2CppHeaders/2022.2.h"
+#elif UNITY_VER >= 233 || UNITY_VER >= 600
+#include "Il2CppHeaders/6000.x.h"
 #elif UNITY_VER >= 231
 #include "Il2CppHeaders/2023.1.h"
 #else

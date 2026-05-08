@@ -196,17 +196,26 @@ namespace BNM::UnityEngine {
     */
     template<typename ...Parameters>
     struct UnityEvent : public UnityEventBase {
+        static inline Method<void> _AddListener_method{};
+        static inline Method<void> _RemoveListener_method{};
+
         Structures::Mono::Array<IL2CPP::Il2CppObject *> *m_InvokeArray{};
 
         /**
             @brief Add listener to event.
         */
-        inline void AddListener(UnityAction<Parameters...> *action) { BNM::Class(klass).GetMethod(BNM_OBFUSCATE("AddListener")).template cast<void>()[this](action); }
+        inline void AddListener(UnityAction<Parameters...> *action) { 
+            if (!_AddListener_method.IsValid()) _AddListener_method = BNM::Class(klass).GetMethod(BNM_OBFUSCATE("AddListener"), 1);
+            _AddListener_method[this](action); 
+        }
 
         /**
             @brief Remove listener from event.
         */
-        inline void RemoveListener(UnityAction<Parameters...> *action) { BNM::Class(klass).GetMethod(BNM_OBFUSCATE("RemoveListener")).template cast<void>()[this](action); }
+        inline void RemoveListener(UnityAction<Parameters...> *action) { 
+            if (!_RemoveListener_method.IsValid()) _RemoveListener_method = BNM::Class(klass).GetMethod(BNM_OBFUSCATE("RemoveListener"), 1);
+            _RemoveListener_method[this](action); 
+        }
 
         /**
             @brief Invoke event.
@@ -263,7 +272,7 @@ namespace BNM::UnityEngine {
                         method = targetType.GetMethod(methodName, {Defaults::Get<bool>()});
                         break;
                 }
-                if (!method.IsValid() || !method._isStatic && !persistentCall->m_Target) continue;
+                if (!method.IsValid() || (!method._isStatic && !persistentCall->m_Target)) continue;
 
                 if (!method._isStatic) method.SetInstance(persistentCall->m_Target);
 

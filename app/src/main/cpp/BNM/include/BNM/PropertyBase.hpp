@@ -107,6 +107,26 @@ namespace BNM {
         */
         template<typename NewRet> inline Property<NewRet> &cast() const { return (Property<NewRet> &)*this; }
 
+        /**
+         * @brief Modern and easy way to get property value.
+         * @tparam T Property type
+         * @return Property value
+         */
+        template<typename T>
+        inline T GetValue() const {
+            return ((Property<T>*)this)->Get();
+        }
+
+        /**
+         * @brief Modern and easy way to set property value.
+         * @tparam T Property type
+         * @param val New value
+         */
+        template<typename T>
+        inline void SetValue(T val) {
+            ((Property<T>*)this)->Set(val);
+        }
+
         IL2CPP::PropertyInfo *_data{};
         MethodBase _getter{}, _setter{};
         uint8_t _hasGetter : 1 = false, _hasSetter : 1 = false;

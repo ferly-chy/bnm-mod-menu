@@ -18,6 +18,14 @@ namespace BNM::Structures::Mono {
     */
     template<typename TKey, typename TValue>
     struct Dictionary : BNM::IL2CPP::Il2CppObject {
+        static inline Method<bool> _TryGetValue_method{};
+        static inline Method<void> _Add_method{};
+        static inline Method<void> _set_Item_method{};
+        static inline Method<bool> _Remove_method{};
+        static inline Method<bool> _ContainsKey_method{};
+        static inline Method<bool> _ContainsValue_method{};
+        static inline Method<void> _Clear_method{};
+
 #ifdef BNM_DOTNET35
         /**
             @brief System.Generic.Dictionary.Link type implementation
@@ -139,47 +147,68 @@ namespace BNM::Structures::Mono {
             @param value Out value
             @return True if value is found by key.
         */
-        bool TryGet(TKey key, TValue *value) const { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("TryGetValue"), 2).template cast<bool>()[(void *)this](key, value); }
+        bool TryGet(TKey key, TValue *value) const { 
+            if (!_TryGetValue_method.IsValid()) _TryGetValue_method = Class(klass).GetMethod(BNM_OBFUSCATE("TryGetValue"), 2);
+            return _TryGetValue_method[(void *)this](key, value); 
+        }
 
         /**
             @brief Add value.
             @param key Target key
             @param value Target value
         */
-        void Add(TKey key, TValue value) { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("Add"), 2).template cast<void>()[(void *)this](key, value); }
+        void Add(TKey key, TValue value) { 
+            if (!_Add_method.IsValid()) _Add_method = Class(klass).GetMethod(BNM_OBFUSCATE("Add"), 2);
+            return _Add_method[(void *)this](key, value); 
+        }
 
         /**
             @brief Insert value.
             @param key Target key
             @param value Target value
         */
-        void Insert(TKey key, TValue value) { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("set_Item"), 2).template cast<void>()[(void *)this](key, value); }
+        void Insert(TKey key, TValue value) { 
+            if (!_set_Item_method.IsValid()) _set_Item_method = Class(klass).GetMethod(BNM_OBFUSCATE("set_Item"), 2);
+            return _set_Item_method[(void *)this](key, value); 
+        }
 
         /**
             @brief Remove value.
             @param key Target key
             @return True if value was removed
         */
-        bool Remove(TKey key) { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("Remove"), 1).template cast<bool>()[(void *)this](key); }
+        bool Remove(TKey key) { 
+            if (!_Remove_method.IsValid()) _Remove_method = Class(klass).GetMethod(BNM_OBFUSCATE("Remove"), 1);
+            return _Remove_method[(void *)this](key); 
+        }
 
         /**
             @brief Check if key exists.
             @param key Target key
             @return True if key exists.
         */
-        bool ContainsKey(TKey key) const { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("ContainsKey"), 1).template cast<bool>()[(void *)this](key); }
+        bool ContainsKey(TKey key) const { 
+            if (!_ContainsKey_method.IsValid()) _ContainsKey_method = Class(klass).GetMethod(BNM_OBFUSCATE("ContainsKey"), 1);
+            return _ContainsKey_method[(void *)this](key); 
+        }
 
         /**
             @brief Check if value exists.
             @param value Target value
             @return True if value exists.
         */
-        bool ContainsValue(TValue value) const { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("ContainsValue"), 1).template cast<bool>()[(void *)this](value); }
+        bool ContainsValue(TValue value) const { 
+            if (!_ContainsValue_method.IsValid()) _ContainsValue_method = Class(klass).GetMethod(BNM_OBFUSCATE("ContainsValue"), 1);
+            return _ContainsValue_method[(void *)this](value); 
+        }
 
         /**
             @brief Clear dictionary.
         */
-        void Clear() { return Class((IL2CPP::Il2CppObject *)this).GetMethod(BNM_OBFUSCATE("Clear"), 0).template cast<void>()[(void *)this](); }
+        void Clear() { 
+            if (!_Clear_method.IsValid()) _Clear_method = Class(klass).GetMethod(BNM_OBFUSCATE("Clear"), 0);
+            return _Clear_method[(void *)this](); 
+        }
 
         /**
             @brief Get value by key.

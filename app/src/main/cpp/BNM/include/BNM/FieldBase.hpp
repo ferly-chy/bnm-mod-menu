@@ -121,6 +121,26 @@ namespace BNM {
         */
         template<typename NewType> inline Field<NewType> &cast() const { return (Field<NewType> &)*this; }
 
+        /**
+         * @brief Modern and easy way to get field value.
+         * @tparam T Field type
+         * @return Field value
+         */
+        template<typename T>
+        inline T GetValue() const {
+            return ((Field<T>*)this)->Get();
+        }
+
+        /**
+         * @brief Modern and easy way to set field value.
+         * @tparam T Field type
+         * @param val New value
+         */
+        template<typename T>
+        inline void SetValue(T val) const {
+            ((Field<T>*)this)->Set(val);
+        }
+
         BNM::IL2CPP::FieldInfo *_data{};
         BNM::IL2CPP::Il2CppObject *_instance{};
         uint8_t _isStatic : 1 = false, _isThreadStatic : 1 = false, _isInStruct : 1 = false, _isConst : 1 = false;

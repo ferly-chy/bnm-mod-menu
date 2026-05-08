@@ -130,9 +130,15 @@ void Utils::LogCompileTimeClass(const CompileTimeClass &compileTimeClass) {
 }
 #endif
 
+static thread_local bool isAttached = false;
+
 bool BNM::AttachIl2Cpp() {
-    if (CurrentIl2CppThread()) return false;
+    if (isAttached || CurrentIl2CppThread()) {
+        isAttached = true;
+        return false;
+    }
     Internal::il2cppMethods.il2cpp_thread_attach(Internal::il2cppMethods.il2cpp_domain_get());
+    isAttached = true;
     return true;
 }
 
@@ -141,9 +147,14 @@ IL2CPP::Il2CppThread *BNM::CurrentIl2CppThread() {
 }
 
 void BNM::DetachIl2Cpp() {
+    if (!isAttached) return;
     auto thread = BNM::CurrentIl2CppThread();
-    if (!thread) return;
+    if (!thread) {
+        isAttached = false;
+        return;
+    }
     Internal::il2cppMethods.il2cpp_thread_detach(thread);
+    isAttached = false;
 }
 
 void *BNM::Allocate(size_t size) {

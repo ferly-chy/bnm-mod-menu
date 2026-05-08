@@ -4,10 +4,12 @@
 #include <BNM/Field.hpp>
 
 #include <Internals.hpp>
+#include "private/Logging.hpp"
 
 using namespace BNM;
 
 void Internal::Load() {
+    SetupLogging();
 #ifdef BNM_ALLOW_MULTI_THREADING_SYNC
     std::unique_lock lock(initMutex);
 #endif
@@ -92,6 +94,7 @@ static bool CheckHandle(void *handle) {
 #endif
 
 bool Loading::TryLoadByJNI(JNIEnv *env, jobject context) {
+    Internal::SetupLogging();
     bool result = false;
 
     if (!env || Internal::il2cppLibraryHandle || Internal::states.state) return result;
@@ -163,6 +166,7 @@ bool Loading::TryLoadByJNI(JNIEnv *env, jobject context) {
 }
 
 bool Loading::TryLoadByDlfcnHandle(void *handle) {
+    Internal::SetupLogging();
     return CheckHandle(handle);
 }
 
@@ -172,6 +176,7 @@ void Loading::SetMethodFinder(BNM::Loading::MethodFinder finderMethod, void *use
 }
 
 bool Loading::TryLoadByUsersFinder() {
+    Internal::SetupLogging();
 
     auto init = Internal::currentFinderMethod(BNM_OBFUSCATE_TMP(BNM_IL2CPP_API_il2cpp_init), Internal::currentFinderData);
     if (!init) return false;
@@ -224,7 +229,7 @@ void *Utils::OffsetInLib(void *offsetInMemory) {
 #endif
 
 bool Internal::SetupBNM() {
-#if defined(__ARM_ARCH_7_A__) || defined(__aarch64__)
+#if defined(__ARM_ARCH_7A__) || defined(__aarch64__)
     const uint8_t count = 1;
 #elif defined(__i386__) || defined(__x86_64__)
     // x86 has one add-on call at start

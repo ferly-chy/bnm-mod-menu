@@ -2,6 +2,10 @@
 #include <cmath>
 #include "Vector3.hpp"
 
+#ifdef BNM_OMATH
+#include <omath/omath.hpp>
+#endif
+
 namespace BNM::Structures::Unity {
     struct Quaternion {
         union {
@@ -13,6 +17,12 @@ namespace BNM::Structures::Unity {
         inline Quaternion(float data[]) noexcept : x(data[0]), y(data[1]), z(data[2]), w(data[3]) {}
         inline Quaternion(Vector3 vector, float scalar) noexcept : x(vector.x), y(vector.y), z(vector.z), w(scalar) {};
         inline Quaternion(float x, float y, float z, float w) noexcept : x(x), y(y), z(z), w(w) {};
+
+#ifdef BNM_OMATH
+        inline Quaternion(const omath::Quaternion<float>& q) : x(q.x), y(q.y), z(q.z), w(q.w) {}
+        inline operator omath::Quaternion<float>() const { return {x, y, z, w}; }
+#endif
+
         inline Quaternion(float Yaw, float Pitch, float Roll) {
             *this = Quaternion::FromEuler(Yaw, Pitch, Roll);
         };

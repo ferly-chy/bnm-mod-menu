@@ -5,6 +5,10 @@
 #include "Vector4.hpp"
 #include "Matrix3x3.hpp"
 
+#ifdef BNM_OMATH
+#include <omath/omath.hpp>
+#endif
+
 #include <cmath>
 
 #define MAT(m, r, c) (m)[(c)*4+(r)]
@@ -31,6 +35,22 @@ namespace BNM::Structures::Unity {
 
         Matrix4x4() = default;
         inline Matrix4x4(InitIdentity) { SetIdentity(); }
+
+#ifdef BNM_OMATH
+        inline Matrix4x4(const omath::Mat<4, 4, float, omath::MatStoreType::COLUMN_MAJOR>& m) {
+            for (int r = 0; r < 4; ++r)
+                for (int c = 0; c < 4; ++c)
+                    Get(r, c) = m.at(r, c);
+        }
+        inline operator omath::Mat<4, 4, float, omath::MatStoreType::COLUMN_MAJOR>() const {
+            omath::Mat<4, 4, float, omath::MatStoreType::COLUMN_MAJOR> res;
+            for (int r = 0; r < 4; ++r)
+                for (int c = 0; c < 4; ++c)
+                    res.at(r, c) = Get(r, c);
+            return res;
+        }
+#endif
+
         inline Matrix4x4(const Matrix3x3 &other) {
             m_Data[0] = other.m_Data[0];
             m_Data[1] = other.m_Data[1];

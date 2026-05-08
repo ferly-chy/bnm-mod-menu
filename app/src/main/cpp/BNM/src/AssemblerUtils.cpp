@@ -1,6 +1,7 @@
 #include "BNM/AssemblerUtils.hpp"
 #include "BNM/DebugMessages.hpp"
 #include <cstdio>
+#include <cstring>
 
 namespace BNM {
 
@@ -8,10 +9,52 @@ namespace AssemblerUtils {
 
 #if defined(__ARM_ARCH_7A__)
 
-    // Check if the assembly is `bl ...` or `b ...`
-    static bool IsBranch(BNM_PTR address) {
-        uint32_t insn = *(uint32_t*)address;
-        return (insn & 0x0A000000) == 0x0A000000;
+    // Check if the address points to Thumb code (LSB is 1)
+    static bool IsThumb(BNM_PTR address) {
+        return address & 1;
+    }
+
+    static bool DecodeBranchOrCall(BNM_PTR address, BNM_PTR &outOffset) {
+        bool thumb = IsThumb(address);
+        BNM_PTR pcAddr = address & ~1;
+        
+        if (thumb) {
+            uint16_t insn1 = *(uint16_t*)pcAddr;
+            // Thumb-2 BL (32-bit): 11110... 11111...
+            if ((insn1 & 0xF800) == 0xF000) {
+                uint16_t insn2 = *(uint16_t*)(pcAddr + 2);
+                if ((insn2 & 0xD000) == 0xD000) {
+                    int32_t s = (insn1 >> 10) & 1;
+                    int32_t j1 = (insn2 >> 13) & 1;
+                    int32_t j2 = (insn2 >> 11) & 1;
+                    int32_t i1 = !(j1 ^ s);
+                    int32_t i2 = !(j2 ^ s);
+                    int32_t imm10 = insn1 & 0x3FF;
+                    int32_t imm11 = insn2 & 0x7FF;
+                    int32_t offset = (s << 24) | (i1 << 23) | (i2 << 22) | (imm10 << 12) | (imm11 << 1);
+                    if (s) offset |= 0xFE000000; // Sign extend
+                    outOffset = (address & ~1) + 4 + offset;
+                    outOffset |= 1; // Keep thumb bit
+                    return true;
+                }
+            }
+            // Thumb B (16-bit): 11100...
+            else if ((insn1 & 0xF800) == 0xE000) {
+                int32_t offset = (int8_t)(insn1 & 0xFF) << 1;
+                outOffset = (address & ~1) + 4 + offset;
+                outOffset |= 1;
+                return true;
+            }
+        } else {
+            // ARM B/BL (32-bit)
+            uint32_t insn = *(uint32_t*)address;
+            if ((insn & 0x0A000000) == 0x0A000000) {
+                int32_t offset = (int32_t)((insn & 0x00FFFFFF) << 8) >> 6;
+                outOffset = address + 8 + offset;
+                return true;
+            }
+        }
+        return false;
     }
 
 #elif defined(__aarch64__)
@@ -44,12 +87,16 @@ namespace AssemblerUtils {
         // B: 0001 01imm26
         if ((insn & 0xFC000000) == 0x14000000) {
             out.type = Arm64InsnType::B;
-            out.imm = (int64_t)((int32_t)((insn & 0x03FFFFFF) << 6) >> 4);
+            int32_t imm26 = insn & 0x03FFFFFF;
+            if (imm26 & 0x02000000) imm26 |= 0xFC000000; // Sign extend
+            out.imm = (int64_t)imm26 << 2;
         }
         // BL: 1001 01imm26
         else if ((insn & 0xFC000000) == 0x94000000) {
             out.type = Arm64InsnType::BL;
-            out.imm = (int64_t)((int32_t)((insn & 0x03FFFFFF) << 6) >> 4);
+            int32_t imm26 = insn & 0x03FFFFFF;
+            if (imm26 & 0x02000000) imm26 |= 0xFC000000; // Sign extend
+            out.imm = (int64_t)imm26 << 2;
         }
         // BR: 1101 0110 0001 1111 0000 00rn 0000 0000
         else if ((insn & 0xFFFFFC1F) == 0xD61F0000) {
@@ -73,8 +120,9 @@ namespace AssemblerUtils {
         else if ((insn & 0xFF000000) == 0x58000000) {
             out.type = Arm64InsnType::LDR_LIT;
             out.rd = insn & 0x1F;
-            int64_t imm = (int32_t)((insn & 0x00FFFFE0) << 8) >> 13;
-            out.imm = imm << 2;
+            int32_t imm19 = (insn >> 5) & 0x7FFFF;
+            if (imm19 & 0x40000) imm19 |= 0xFFF80000; // Sign extend
+            out.imm = (int64_t)imm19 << 2;
         }
         // ADD (immediate): sf:1 0010001 sh:1 imm12:12 rn:5 rd:5
         else if ((insn & 0xFF000000) == 0x91000000) {
@@ -93,27 +141,7 @@ namespace AssemblerUtils {
         return out;
     }
 
-    // Check if the assembly is `bl ...` or `b ...`
-    static bool IsBranch(BNM_PTR address) {
-        auto insn = DecodeArm64Insn(address);
-        return insn.type == Arm64InsnType::B || insn.type == Arm64InsnType::BL;
-    }
-
-#elif defined(__i386__) || defined(__x86_64__)
-
-    // Check if the assembly is `call ...`
-    static bool IsCall(BNM_PTR address) { return *(uint8_t*)address == 0xE8; }
-#endif
-
-    // Decode b or bl and get the address it goes to
     static bool DecodeBranchOrCall(BNM_PTR address, BNM_PTR &outOffset) {
-#if defined(__ARM_ARCH_7A__)
-        if (!IsBranch(address)) return false;
-        uint32_t insn = *(uint32_t*)address;
-        uint8_t add = 8;
-        int32_t offset = (int32_t)((insn & 0x00FFFFFF) << 8) >> 6;
-        outOffset = address + offset + add;
-#elif defined(__aarch64__)
         auto insn = DecodeArm64Insn(address);
         if (insn.type == Arm64InsnType::B || insn.type == Arm64InsnType::BL) {
             outOffset = address + insn.imm;
@@ -129,8 +157,8 @@ namespace AssemblerUtils {
             int64_t addImm = 0;
             int64_t ldrImm = 0;
 
-            // Scan backward up to 10 instructions to find ADRP and ADD or LDR
-            for (int i = 1; i <= 10; ++i) {
+            // Scan backward up to 16 instructions to find ADRP and ADD or LDR
+            for (int i = 1; i <= 16; ++i) {
                 auto prevInsn = DecodeArm64Insn(address - i * 4);
                 if (prevInsn.rd != targetReg) continue;
 
@@ -152,29 +180,33 @@ namespace AssemblerUtils {
                 outOffset = *(BNM_PTR*)(ldrAddr + ldrImm);
                 return true;
             } else if (adrpAddr && addAddr) {
-                // ADRP computes (PC & ~0xFFF) + offset
-                BNM_PTR base = (adrpAddr & ~0xFFFULL) + adrpImm;
-                outOffset = base + addImm;
+                outOffset = (adrpAddr & ~0xFFFULL) + adrpImm + addImm;
                 return true;
             }
         }
         return false;
-#elif defined(__i386__) || defined(__x86_64__)
-        if (!IsCall(address)) return false;
-        // Address + address from the `call` + size of the instruction
-        outOffset = address + *(int32_t*)(address + 1) + 5;
-#else
-#error "BNM only supports arm64, arm, x86 and x86_64"
-        return false;
-#endif
-        return true;
     }
+
+#elif defined(__i386__) || defined(__x86_64__)
+
+    static bool DecodeBranchOrCall(BNM_PTR address, BNM_PTR &outOffset) {
+        uint8_t op = *(uint8_t*)address;
+        if (op == 0xE8 || op == 0xE9) { // CALL or JMP rel32
+            outOffset = address + *(int32_t*)(address + 1) + 5;
+            return true;
+        }
+        return false;
+    }
+#endif
 
     void DiagnosticDump(BNM_PTR address, size_t size) {
         if (!address) return;
-        char buf[size * 3 + 1];
-        for (size_t i = 0; i < size; ++i) {
-            sprintf(buf + i * 3, "%02X ", *(uint8_t*)(address + i));
+        // Use fixed size buffer for diagnostics
+        char buf[1024];
+        size_t actualSize = size > 256 ? 256 : size;
+        BNM_PTR pcAddr = address & ~1;
+        for (size_t i = 0; i < actualSize; ++i) {
+            sprintf(buf + i * 3, "%02X ", *(uint8_t*)(pcAddr + i));
         }
         BNM_LOG_DEBUG("BNM: Diagnostic dump at %p: %s", (void*)address, buf);
     }
@@ -185,8 +217,8 @@ namespace AssemblerUtils {
 
         for (uint8_t i = 0; i < index; ++i) {
             bool found = false;
-            // Scan up to 200 bytes for the next jump
-            for (int j = 0; j < 200; j += (sizeof(BNM_PTR) == 8 ? 4 : 1)) {
+            // Scan up to 256 bytes for the next jump
+            for (int j = 0; j < 256; j += (sizeof(BNM_PTR) == 8 ? 4 : 2)) {
                 if (DecodeBranchOrCall(currentPos + j, outOffset)) {
                     currentPos = outOffset;
                     found = true;

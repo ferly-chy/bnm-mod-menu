@@ -17,7 +17,8 @@ BNM::Exception BNM::TryInvoke(const std::function<void()> &func) {
 #if UNITY_VER < 171
     info.invoker_method = (BNM::IL2CPP::InvokerMethod) +[](BNM::IL2CPP::MethodInfo *info) -> void { ((*(std::function<void()>*)info->methodPointer))(); };
 #else
-    info.invoker_method = (BNM::IL2CPP::InvokerMethod) +[](std::function<void()> *func) -> void { (*func)(); };
+    // Silencing the cast mismatch by casting through void*
+    info.invoker_method = (BNM::IL2CPP::InvokerMethod)(void*) +[](std::function<void()> *func) -> void { (*func)(); };
 #endif
     BNM::IL2CPP::Il2CppException *exception = nullptr;
     Internal::il2cppMethods.il2cpp_runtime_invoke(&info, nullptr, nullptr, &exception);

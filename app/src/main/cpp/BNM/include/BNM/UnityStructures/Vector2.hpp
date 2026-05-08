@@ -1,6 +1,11 @@
 #pragma once
 
 #include <cmath>
+#include "../UserSettings/GlobalSettings.hpp"
+
+#ifdef BNM_OMATH
+#include <omath/omath.hpp>
+#endif
 
 namespace BNM::Structures::Unity {
     struct Vector2;
@@ -13,6 +18,11 @@ namespace BNM::Structures::Unity {
         };
         inline constexpr Vector2() : x(0), y(0) {};
         inline constexpr Vector2(float x, float y) : x(x), y(y) {};
+
+#ifdef BNM_OMATH
+        inline Vector2(const omath::Vector2<float>& v) : x(v.x), y(v.y) {}
+        inline operator omath::Vector2<float>() const { return {x, y}; }
+#endif
 
         inline float* GetPtr() { return data; }
         [[nodiscard]] inline const float* GetPtr() const { return data; }

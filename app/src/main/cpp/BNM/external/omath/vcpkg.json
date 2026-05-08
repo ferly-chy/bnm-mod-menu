@@ -1,0 +1,87 @@
+{
+  "name": "omath",
+  "version": "3.10.1",
+  "description": "General purpose math library",
+  "homepage": "https://github.com/orange-cpp/omath",
+  "license": "Zlib",
+  "supports": "windows | linux | macos",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "features": {
+    "all": {
+      "description": "Enable all additional features",
+      "dependencies": [
+        {
+          "name": "omath",
+          "features": ["imgui", "lua", "hooking"]
+        }
+      ]
+    },
+    "avx2": {
+      "description": "omath will use AVX2 to boost performance",
+      "supports": "!arm"
+    },
+    "benchmark": {
+      "description": "Build benchmarks",
+      "dependencies": [
+        "benchmark"
+      ]
+    },
+    "hooking": {
+      "description": "Add interface for automatic hooking of DirectX",
+      "dependencies": [
+        "safetyhook"
+      ],
+      "supports": "(windows | linux) & !arm & !uwp"
+    },
+    "examples": {
+      "description": "Build examples",
+      "dependencies": [
+        "glfw3",
+        "glew",
+        "opengl",
+        {
+          "name": "omath",
+          "features": ["hooking"],
+          "platform": "windows & !arm & !uwp"
+        },
+        {
+          "name": "imgui",
+          "features": ["glfw-binding", "opengl3-binding"]
+        },
+        {
+          "name": "imgui",
+          "features": ["dx9-binding", "dx11-binding", "dx12-binding", "win32-binding"],
+          "platform": "windows & !arm & !uwp"
+        }
+      ]
+    },
+    "imgui": {
+      "description": "omath will define method to convert omath types to imgui types",
+      "dependencies": [
+        "imgui"
+      ]
+    },
+    "tests": {
+      "description": "Build unit-tests using GTest",
+      "dependencies": [
+        "gtest"
+      ]
+    },
+    "lua": {
+      "description": "lua support for omath",
+      "dependencies": [
+        "lua",
+        "sol2"
+      ]
+    }
+  }
+}

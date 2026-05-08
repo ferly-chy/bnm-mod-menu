@@ -1,0 +1,12 @@
+//
+// Created by Orange on 12/23/2024.
+//
+#pragma once
+#include "omath/engines/opengl_engine/constants.hpp"
+#include "omath/projection/camera.hpp"
+#include "traits/camera_trait.hpp"
+
+namespace omath::opengl_engine
+{
+    using Camera = projection::Camera<Mat4X4, ViewAngles, CameraTrait, NDCDepthRange::NEGATIVE_ONE_TO_ONE, {.inverted_forward = true}>;
+} // namespace omath::opengl_engine

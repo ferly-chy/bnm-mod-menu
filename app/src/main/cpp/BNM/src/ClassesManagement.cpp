@@ -3,6 +3,7 @@
 #ifdef BNM_CLASSES_MANAGEMENT
 
 #include <Internals.hpp>
+#include "private/MetadataPool.hpp"
 #include <atomic>
 
 static inline void SafePatchVTable(BNM::IL2CPP::VirtualInvokeData* vtable, void* newMethodPtr, const BNM::IL2CPP::MethodInfo* newMethod) {
@@ -36,10 +37,8 @@ namespace BNM::Internal::ClassesManagement {
 }
 
 static inline void *BNM_malloc_tracked(size_t size) {
-    void *ptr = BNM_malloc(size);
-    if (BNM::Internal::ClassesManagement::currentTracker) BNM::Internal::ClassesManagement::currentTracker->Track(ptr);
-    else BNM::Internal::ClassesManagement::TrackAllocation(ptr);
-    return ptr;
+    // Use Pool Allocator for metadata objects instead of individual mallocs
+    return BNM::Internal::MetadataPool::Allocate(size);
 }
 #define BNM_MALLOC_TRACKED(size) BNM_malloc_tracked(size)
 
@@ -140,7 +139,6 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
 
     if (newMethodsCount) {
         auto oldCount = klass->method_count;
-        auto oldMethods = klass->methods;
 
         std::vector<IL2CPP::MethodInfo *> methodsToAdd{};
 
@@ -161,18 +159,23 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
         }
 
         if (!methodsToAdd.empty()) {
+            auto oldMethods = klass->methods;
             auto newMethods = (IL2CPP::MethodInfo **) BNM_MALLOC_TRACKED((oldCount + methodsToAdd.size()) * sizeof(IL2CPP::MethodInfo *));
 
             auto oldSize = oldCount * sizeof(IL2CPP::MethodInfo *);
 
-            if (oldCount) memcpy(newMethods, oldMethods, oldSize);
+            if (oldCount && oldMethods) memcpy(newMethods, oldMethods, oldSize);
 
             memcpy(newMethods + oldCount, methodsToAdd.data(), methodsToAdd.size() * sizeof(IL2CPP::MethodInfo *));
 
-            // To prevent dangling pointers, we do not free the old methods array if it was already allocated.
-            // Classes modification happens rarely, so this small leak is acceptable for stability.
-            // if ((klass->flags & BNM_CLASS_ALLOCATED_METHODS_FLAG) == BNM_CLASS_ALLOCATED_METHODS_FLAG) BNM_free(klass->methods);
+            // Track old array for cleanup at shutdown if it was allocated by us
+            if ((klass->flags & BNM_CLASS_ALLOCATED_METHODS_FLAG) == BNM_CLASS_ALLOCATED_METHODS_FLAG) {
+                Internal::ClassesManagement::TrackAllocation((void*)oldMethods);
+            }
             klass->flags |= BNM_CLASS_ALLOCATED_METHODS_FLAG;
+
+            // Ensure all metadata is visible before publishing new array
+            std::atomic_thread_fence(std::memory_order_seq_cst);
 
             // Atomic update of the methods array pointer
             auto atomicMethods = reinterpret_cast<std::atomic<const IL2CPP::MethodInfo**>*>(&klass->methods);
@@ -186,10 +189,11 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
 
     if (newFieldsCount) {
         auto oldCount = klass->field_count;
+        auto oldFields = klass->fields;
 
         auto newFields = (IL2CPP::FieldInfo *) BNM_MALLOC_TRACKED((oldCount + newFieldsCount) * sizeof(IL2CPP::FieldInfo));
 
-        if (oldCount) memcpy(newFields, klass->fields, oldCount * sizeof(IL2CPP::FieldInfo));
+        if (oldCount && oldFields) memcpy(newFields, oldFields, oldCount * sizeof(IL2CPP::FieldInfo));
 
         auto &currentAddress = klass->instance_size;
 
@@ -209,11 +213,14 @@ static void ModifyClass(MANAGEMENT_STRUCTURES::CustomClass *customClass, Class t
             BNM_LOG_DEBUG(DBG_BNM_MSG_ClassesManagement_ModifyClasses_Added_Field, field->_name.data());
         }
 
+        // Track old array for cleanup at shutdown if it was allocated by us
         if ((klass->flags & BNM_CLASS_ALLOCATED_FIELDS_FLAG) == BNM_CLASS_ALLOCATED_FIELDS_FLAG) {
-            // To prevent dangling pointers, we do not free the old fields array if it was already allocated.
-            // if ((klass->flags & BNM_CLASS_ALLOCATED_FIELDS_FLAG) == BNM_CLASS_ALLOCATED_FIELDS_FLAG) BNM_free(klass->fields);
+            Internal::ClassesManagement::TrackAllocation((void*)oldFields);
         }
         klass->flags |= BNM_CLASS_ALLOCATED_FIELDS_FLAG;
+
+        // Ensure all field metadata is visible before publishing new array
+        std::atomic_thread_fence(std::memory_order_seq_cst);
 
         // Atomic update of the fields array pointer
         auto atomicFields = reinterpret_cast<std::atomic<IL2CPP::FieldInfo*>*>(&klass->fields);

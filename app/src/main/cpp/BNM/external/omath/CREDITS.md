@@ -1,0 +1,13 @@
+# OMATH CREDITS
+
+Thanks to everyone who made this possible, including:
+
+- Saikari aka luadebug for VCPKG port and awesome new initial logo design.
+- Billy O'Neal aka BillyONeal for fixing compilation issues due to C math library compatibility.
+- Alex2772 for reference of AUI declarative interface design for omath::hud
+
+And a big hand to everyone else who has contributed over the past!
+
+THANKS! <3
+
+    -- Orange++ <orange_github@proton.me>

@@ -1,0 +1,552 @@
+//
+// Created by Vlad on 01.09.2024.
+//
+
+#include <omath/linear_algebra/vector3.hpp>
+#include <cfloat> // For FLT_MAX, FLT_MIN
+#include <cmath>
+#include <gtest/gtest.h>
+#include <limits> // For std::numeric_limits
+
+using namespace omath;
+
+TEST(Vector3More, ConstructorsAndEquality)
+{
+    constexpr Vector3<float> a;
+    EXPECT_EQ(a.x, 0.f);
+    EXPECT_EQ(a.y, 0.f);
+    EXPECT_EQ(a.z, 0.f);
+
+    constexpr Vector3<float> b{1.f, 2.f, 3.f};
+    EXPECT_EQ(b.x, 1.f);
+    EXPECT_EQ(b.y, 2.f);
+    EXPECT_EQ(b.z, 3.f);
+
+    const Vector3<float> c = b;
+    EXPECT_EQ(c, b);
+}
+
+TEST(Vector3More, ArithmeticAndDotCross)
+{
+    constexpr Vector3<float> a{1.f, 0.f, 0.f};
+    constexpr Vector3<float> b{0.f, 1.f, 0.f};
+    const auto c = a + b;
+    constexpr Vector3<float> expect_c{1.f,1.f,0.f};
+    EXPECT_EQ(c, expect_c);
+
+    const auto d = a - b;
+    constexpr Vector3<float> expect_d{1.f,-1.f,0.f};
+    EXPECT_EQ(d, expect_d);
+
+    const auto e = a * 2.f;
+    constexpr Vector3<float> expect_e{2.f,0.f,0.f};
+    EXPECT_EQ(e, expect_e);
+
+    EXPECT_FLOAT_EQ(a.dot(b), 0.f);
+    // manual cross product check
+    const auto cr = Vector3<float>{ a.y * b.z - a.z * b.y,
+                              a.z * b.x - a.x * b.z,
+                              a.x * b.y - a.y * b.x };
+    constexpr Vector3<float> expect_cr{0.f,0.f,1.f};
+    EXPECT_EQ(cr, expect_cr);
+}
+
+TEST(Vector3More, NormalizationEdgeCases)
+{
+    constexpr Vector3<double> z{0.0,0.0,0.0};
+    const auto zn = z.normalized();
+    EXPECT_DOUBLE_EQ(zn.x, 0.0);
+    EXPECT_DOUBLE_EQ(zn.y, 0.0);
+    EXPECT_DOUBLE_EQ(zn.z, 0.0);
+
+    constexpr Vector3<double> v{3.0,4.0,0.0};
+    const auto vn = v.normalized();
+    EXPECT_NEAR(vn.x, 0.6, 1e-12);
+    EXPECT_NEAR(vn.y, 0.8, 1e-12);
+}
+
+class UnitTestVector3 : public ::testing::Test
+{
+protected:
+    Vector3<float> v1;
+    Vector3<float> v2;
+
+    void SetUp() override
+    {
+        v1 = Vector3(1.0f, 2.0f, 3.0f);
+        v2 = Vector3(4.0f, 5.0f, 6.0f);
+    }
+};
+
+// Test constructor and default values
+TEST_F(UnitTestVector3, Constructor_Default)
+{
+    constexpr Vector3<float> v;
+    EXPECT_FLOAT_EQ(v.x, 0.0f);
+    EXPECT_FLOAT_EQ(v.y, 0.0f);
+    EXPECT_FLOAT_EQ(v.z, 0.0f);
+}
+
+TEST_F(UnitTestVector3, Constructor_Values)
+{
+    constexpr Vector3<float> v(1.0f, 2.0f, 3.0f);
+    EXPECT_FLOAT_EQ(v.x, 1.0f);
+    EXPECT_FLOAT_EQ(v.y, 2.0f);
+    EXPECT_FLOAT_EQ(v.z, 3.0f);
+}
+
+// Test equality operators
+TEST_F(UnitTestVector3, EqualityOperator)
+{
+    constexpr Vector3 v3(1.0f, 2.0f, 3.0f);
+    EXPECT_TRUE(v1 == v3);
+    EXPECT_FALSE(v1 == v2);
+}
+
+TEST_F(UnitTestVector3, InequalityOperator)
+{
+    constexpr Vector3 v3(1.0f, 2.0f, 3.0f);
+    EXPECT_FALSE(v1 != v3);
+    EXPECT_TRUE(v1 != v2);
+}
+
+// Test arithmetic operators
+TEST_F(UnitTestVector3, AdditionOperator)
+{
+    constexpr Vector3 v3 = Vector3(1.0f, 2.0f, 3.0f) + Vector3(4.0f, 5.0f, 6.0f);
+    EXPECT_FLOAT_EQ(v3.x, 5.0f);
+    EXPECT_FLOAT_EQ(v3.y, 7.0f);
+    EXPECT_FLOAT_EQ(v3.z, 9.0f);
+}
+
+TEST_F(UnitTestVector3, SubtractionOperator)
+{
+    constexpr Vector3 v3 = Vector3(4.0f, 5.0f, 6.0f) - Vector3(1.0f, 2.0f, 3.0f);
+    EXPECT_FLOAT_EQ(v3.x, 3.0f);
+    EXPECT_FLOAT_EQ(v3.y, 3.0f);
+    EXPECT_FLOAT_EQ(v3.z, 3.0f);
+}
+
+TEST_F(UnitTestVector3, MultiplicationOperator_Scalar)
+{
+    constexpr Vector3 v3 = Vector3(1.0f, 2.0f, 3.0f) * 2.0f;
+    EXPECT_FLOAT_EQ(v3.x, 2.0f);
+    EXPECT_FLOAT_EQ(v3.y, 4.0f);
+    EXPECT_FLOAT_EQ(v3.z, 6.0f);
+}
+
+TEST_F(UnitTestVector3, MultiplicationOperator_Vector)
+{
+    constexpr auto v3 = Vector3(1.0f, 2.0f, 3.0f) * Vector3(4.0f, 5.0f, 6.0f);
+    EXPECT_FLOAT_EQ(v3.x, 4.0f);
+    EXPECT_FLOAT_EQ(v3.y, 10.0f);
+    EXPECT_FLOAT_EQ(v3.z, 18.0f);
+}
+
+TEST_F(UnitTestVector3, DivisionOperator_Scalar)
+{
+    constexpr auto v3 = Vector3(4.0f, 5.0f, 6.0f) / 2.0f;
+    EXPECT_FLOAT_EQ(v3.x, 2.0f);
+    EXPECT_FLOAT_EQ(v3.y, 2.5f);
+    EXPECT_FLOAT_EQ(v3.z, 3.0f);
+}
+
+TEST_F(UnitTestVector3, DivisionOperator_Vector)
+{
+    constexpr auto v3 = Vector3(4.0f, 5.0f, 6.0f) / Vector3(1.0f, 2.0f, 3.0f);
+    EXPECT_FLOAT_EQ(v3.x, 4.0f);
+    EXPECT_FLOAT_EQ(v3.y, 2.5f);
+    EXPECT_FLOAT_EQ(v3.z, 2.0f);
+}
+
+// Test compound assignment operators
+TEST_F(UnitTestVector3, AdditionAssignmentOperator)
+{
+    v1 += v2;
+    EXPECT_FLOAT_EQ(v1.x, 5.0f);
+    EXPECT_FLOAT_EQ(v1.y, 7.0f);
+    EXPECT_FLOAT_EQ(v1.z, 9.0f);
+}
+
+TEST_F(UnitTestVector3, SubtractionAssignmentOperator)
+{
+    v1 -= v2;
+    EXPECT_FLOAT_EQ(v1.x, -3.0f);
+    EXPECT_FLOAT_EQ(v1.y, -3.0f);
+    EXPECT_FLOAT_EQ(v1.z, -3.0f);
+}
+
+TEST_F(UnitTestVector3, MultiplicationAssignmentOperator_Scalar)
+{
+    v1 *= 2.0f;
+    EXPECT_FLOAT_EQ(v1.x, 2.0f);
+    EXPECT_FLOAT_EQ(v1.y, 4.0f);
+    EXPECT_FLOAT_EQ(v1.z, 6.0f);
+}
+
+TEST_F(UnitTestVector3, MultiplicationAssignmentOperator_Vector)
+{
+    v1 *= v2;
+    EXPECT_FLOAT_EQ(v1.x, 4.0f);
+    EXPECT_FLOAT_EQ(v1.y, 10.0f);
+    EXPECT_FLOAT_EQ(v1.z, 18.0f);
+}
+
+TEST_F(UnitTestVector3, DivisionAssignmentOperator_Scalar)
+{
+    v1 /= 2.0f;
+    EXPECT_FLOAT_EQ(v1.x, 0.5f);
+    EXPECT_FLOAT_EQ(v1.y, 1.0f);
+    EXPECT_FLOAT_EQ(v1.z, 1.5f);
+}
+
+TEST_F(UnitTestVector3, DivisionAssignmentOperator_Vector)
+{
+    v1 /= v2;
+    EXPECT_FLOAT_EQ(v1.x, 0.25f);
+    EXPECT_FLOAT_EQ(v1.y, 0.4f);
+    EXPECT_FLOAT_EQ(v1.z, 0.5f);
+}
+
+TEST_F(UnitTestVector3, NegationOperator)
+{
+    constexpr auto v3 = -Vector3(1.0f, 2.0f, 3.0f);
+    EXPECT_FLOAT_EQ(v3.x, -1.0f);
+    EXPECT_FLOAT_EQ(v3.y, -2.0f);
+    EXPECT_FLOAT_EQ(v3.z, -3.0f);
+}
+
+// Test other member functions
+TEST_F(UnitTestVector3, DistToSqr)
+{
+    constexpr auto distSqr = Vector3(1.0f, 2.0f, 3.0f).distance_to_sqr(Vector3(4.0f, 5.0f, 6.0f));
+    EXPECT_FLOAT_EQ(distSqr, 27.0f);
+}
+
+TEST_F(UnitTestVector3, DotProduct)
+{
+    constexpr auto dot = Vector3(1.0f, 2.0f, 3.0f).dot(Vector3(4.0f, 5.0f, 6.0f));
+    EXPECT_FLOAT_EQ(dot, 32.0f);
+}
+
+TEST_F(UnitTestVector3, LengthSqr)
+{
+    constexpr auto lengthSqr = Vector3(1.0f, 2.0f, 3.0f).length_sqr();
+    EXPECT_FLOAT_EQ(lengthSqr, 14.0f);
+}
+
+TEST_F(UnitTestVector3, Abs)
+{
+    auto v3 = Vector3(-1.0f, -2.0f, -3.0f);
+    v3.abs();
+    EXPECT_FLOAT_EQ(v3.x, 1.0f);
+    EXPECT_FLOAT_EQ(v3.y, 2.0f);
+    EXPECT_FLOAT_EQ(v3.z, 3.0f);
+}
+
+TEST_F(UnitTestVector3, Sum)
+{
+    constexpr auto sum = Vector3(1.0f, 2.0f, 3.0f).sum();
+    EXPECT_FLOAT_EQ(sum, 6.0f);
+}
+
+TEST_F(UnitTestVector3, Sum2D)
+{
+    constexpr auto sum2D = Vector3(1.0f, 2.0f, 3.0f).sum_2d();
+    EXPECT_FLOAT_EQ(sum2D, 3.0f);
+}
+
+TEST_F(UnitTestVector3, CrossProduct)
+{
+    constexpr Vector3 v3 = Vector3(1.0f, 2.0f, 3.0f).cross(Vector3(4.0f, 5.0f, 6.0f));
+    EXPECT_FLOAT_EQ(v3.x, -3.0f);
+    EXPECT_FLOAT_EQ(v3.y, 6.0f);
+    EXPECT_FLOAT_EQ(v3.z, -3.0f);
+}
+
+// New tests to cover corner cases
+
+// Test operations with zero vectors
+TEST_F(UnitTestVector3, Addition_WithZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const Vector3 result = v1 + v_zero;
+    EXPECT_FLOAT_EQ(result.x, v1.x);
+    EXPECT_FLOAT_EQ(result.y, v1.y);
+    EXPECT_FLOAT_EQ(result.z, v1.z);
+}
+
+TEST_F(UnitTestVector3, Subtraction_WithZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const Vector3 result = v1 - v_zero;
+    EXPECT_FLOAT_EQ(result.x, v1.x);
+    EXPECT_FLOAT_EQ(result.y, v1.y);
+    EXPECT_FLOAT_EQ(result.z, v1.z);
+}
+
+TEST_F(UnitTestVector3, Multiplication_WithZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const Vector3 result = v1 * v_zero;
+    EXPECT_FLOAT_EQ(result.x, 0.0f);
+    EXPECT_FLOAT_EQ(result.y, 0.0f);
+    EXPECT_FLOAT_EQ(result.z, 0.0f);
+}
+
+TEST_F(UnitTestVector3, Division_ByZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const Vector3 result = v1 / v_zero;
+    EXPECT_TRUE(std::isinf(result.x) || std::isnan(result.x));
+    EXPECT_TRUE(std::isinf(result.y) || std::isnan(result.y));
+    EXPECT_TRUE(std::isinf(result.z) || std::isnan(result.z));
+}
+
+TEST_F(UnitTestVector3, Division_ByZeroScalar)
+{
+    constexpr float zero = 0.0f;
+    const Vector3 result = v1 / zero;
+    EXPECT_TRUE(std::isinf(result.x) || std::isnan(result.x));
+    EXPECT_TRUE(std::isinf(result.y) || std::isnan(result.y));
+    EXPECT_TRUE(std::isinf(result.z) || std::isnan(result.z));
+}
+
+// Test operations with infinity
+TEST_F(UnitTestVector3, Addition_WithInfinity)
+{
+    const Vector3 v_inf(INFINITY, INFINITY, INFINITY);
+    const Vector3 result = v1 + v_inf;
+    EXPECT_TRUE(std::isinf(result.x));
+    EXPECT_TRUE(std::isinf(result.y));
+    EXPECT_TRUE(std::isinf(result.z));
+}
+
+TEST_F(UnitTestVector3, Subtraction_WithInfinity)
+{
+    constexpr Vector3 v_inf(INFINITY, INFINITY, INFINITY);
+    const Vector3 result = v1 - v_inf;
+    EXPECT_TRUE(std::isinf(result.x));
+    EXPECT_TRUE(std::isinf(result.y));
+    EXPECT_TRUE(std::isinf(result.z));
+}
+
+// Test operations with NaN
+TEST_F(UnitTestVector3, Multiplication_WithNaN)
+{
+    constexpr Vector3 v_nan(NAN, NAN, NAN);
+    const Vector3 result = v1 * v_nan;
+    EXPECT_TRUE(std::isnan(result.x));
+    EXPECT_TRUE(std::isnan(result.y));
+    EXPECT_TRUE(std::isnan(result.z));
+}
+
+TEST_F(UnitTestVector3, Division_WithNaN)
+{
+    constexpr Vector3 v_nan(NAN, NAN, NAN);
+    const Vector3 result = v1 / v_nan;
+    EXPECT_TRUE(std::isnan(result.x));
+    EXPECT_TRUE(std::isnan(result.y));
+    EXPECT_TRUE(std::isnan(result.z));
+}
+
+// Test Length, Length2D, and Normalized
+TEST_F(UnitTestVector3, Length)
+{
+    const float length = v1.length();
+    EXPECT_FLOAT_EQ(length, std::sqrt(14.0f));
+}
+
+TEST_F(UnitTestVector3, Length_ZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const float length = v_zero.length();
+    EXPECT_FLOAT_EQ(length, 0.0f);
+}
+
+TEST_F(UnitTestVector3, Length_LargeValues)
+{
+    constexpr Vector3 v_large(FLT_MAX, FLT_MAX, FLT_MAX);
+    const float length = v_large.length();
+    EXPECT_TRUE(std::isinf(length));
+}
+
+TEST_F(UnitTestVector3, Length2D)
+{
+    const float length2D = v1.length_2d();
+    EXPECT_FLOAT_EQ(length2D, std::sqrt(5.0f));
+}
+
+TEST_F(UnitTestVector3, Normalized)
+{
+    const Vector3 v_norm = v1.normalized();
+    const float length = v_norm.length();
+    EXPECT_NEAR(length, 1.0f, 0.0001f);
+}
+
+TEST_F(UnitTestVector3, Normalized_ZeroVector)
+{
+    constexpr Vector3 v_zero(0.0f, 0.0f, 0.0f);
+    const Vector3 v_norm = v_zero.normalized();
+    EXPECT_FLOAT_EQ(v_norm.x, 0.0f);
+    EXPECT_FLOAT_EQ(v_norm.y, 0.0f);
+    EXPECT_FLOAT_EQ(v_norm.z, 0.0f);
+}
+
+// Test Cross Product edge cases
+TEST_F(UnitTestVector3, CrossProduct_ParallelVectors)
+{
+    constexpr Vector3 v_a(1.0f, 2.0f, 3.0f);
+    constexpr Vector3 v_b = v_a * 2.0f; // Parallel to v_a
+    constexpr Vector3 cross = v_a.cross(v_b);
+    EXPECT_FLOAT_EQ(cross.x, 0.0f);
+    EXPECT_FLOAT_EQ(cross.y, 0.0f);
+    EXPECT_FLOAT_EQ(cross.z, 0.0f);
+}
+
+TEST_F(UnitTestVector3, CrossProduct_OrthogonalVectors)
+{
+    constexpr Vector3 v_a(1.0f, 0.0f, 0.0f);
+    constexpr Vector3 v_b(0.0f, 1.0f, 0.0f);
+    constexpr Vector3 cross = v_a.cross(v_b);
+    EXPECT_FLOAT_EQ(cross.x, 0.0f);
+    EXPECT_FLOAT_EQ(cross.y, 0.0f);
+    EXPECT_FLOAT_EQ(cross.z, 1.0f);
+}
+
+// Test negative values
+TEST_F(UnitTestVector3, Addition_NegativeValues)
+{
+    constexpr Vector3 v_neg(-1.0f, -2.0f, -3.0f);
+    const Vector3 result = v1 + v_neg;
+    EXPECT_FLOAT_EQ(result.x, 0.0f);
+    EXPECT_FLOAT_EQ(result.y, 0.0f);
+    EXPECT_FLOAT_EQ(result.z, 0.0f);
+}
+
+TEST_F(UnitTestVector3, Subtraction_NegativeValues)
+{
+    constexpr Vector3 v_neg(-1.0f, -2.0f, -3.0f);
+    const Vector3 result = v1 - v_neg;
+    EXPECT_FLOAT_EQ(result.x, 2.0f);
+    EXPECT_FLOAT_EQ(result.y, 4.0f);
+    EXPECT_FLOAT_EQ(result.z, 6.0f);
+}
+
+// Test AsTuple method
+TEST_F(UnitTestVector3, AsTuple)
+{
+    const auto tuple = v1.as_tuple();
+    EXPECT_FLOAT_EQ(std::get<0>(tuple), v1.x);
+    EXPECT_FLOAT_EQ(std::get<1>(tuple), v1.y);
+    EXPECT_FLOAT_EQ(std::get<2>(tuple), v1.z);
+}
+
+// Test AsTuple method
+TEST_F(UnitTestVector3, AngleBeatween)
+{
+    EXPECT_NEAR(Vector3(0.0f, 0.0f, 1.0f).angle_between({1, 0, 0}).value().as_degrees(),
+                90.0f, 0.001f);
+    EXPECT_NEAR(Vector3(0.0f, 0.0f, 1.0f).angle_between({0.0f, 0.0f, 1.0f}).value().as_degrees(),
+                0.0f, 0.001f);
+    EXPECT_FALSE(Vector3(0.0f, 0.0f, 0.0f).angle_between({0.0f, 0.0f, 1.0f}).has_value());
+}
+
+TEST_F(UnitTestVector3, IsPerpendicular)
+{
+    EXPECT_EQ(Vector3(0.0f, 0.0f, 1.0f).is_perpendicular({1, 0 ,0}), true);
+    EXPECT_EQ(Vector3(0.0f, 0.0f, 1.0f).is_perpendicular({0.0f, 0.0f, 1.0f}), false);
+    EXPECT_FALSE(Vector3(0.0f, 0.0f, 0.0f).is_perpendicular({0.0f, 0.0f, 1.0f}));
+}
+
+TEST_F(UnitTestVector3, LessOperator)
+{
+    EXPECT_TRUE(v1 < v2);
+}
+
+TEST_F(UnitTestVector3, GreaterOperator)
+{
+    EXPECT_TRUE(v2 > v1);
+}
+TEST_F(UnitTestVector3, LessEqualOperator)
+{
+    EXPECT_TRUE(omath::Vector3<float>{} <= omath::Vector3<float>{});
+    EXPECT_TRUE(omath::Vector3<float>{} <= omath::Vector3(1.f, 1.f, 1.f));
+}
+
+TEST_F(UnitTestVector3, GreaterEqualOperator)
+{
+    EXPECT_TRUE(omath::Vector3<float>{} >= omath::Vector3<float>{});
+    EXPECT_TRUE(omath::Vector3(1.f, 1.f, 1.f) >= omath::Vector3<float>{});
+}
+
+// ── Cast operator tests ──────────────────────────────────────────────────────
+
+TEST(Vector3Cast, FloatToDouble)
+{
+    constexpr Vector3<float> v{1.5f, -2.5f, 3.0f};
+    constexpr auto result = static_cast<Vector3<double>>(v);
+    EXPECT_DOUBLE_EQ(result.x, 1.5);
+    EXPECT_DOUBLE_EQ(result.y, -2.5);
+    EXPECT_DOUBLE_EQ(result.z, 3.0);
+}
+
+TEST(Vector3Cast, DoubleToFloat)
+{
+    constexpr Vector3<double> v{1.25, -3.75, 0.5};
+    constexpr auto result = static_cast<Vector3<float>>(v);
+    EXPECT_FLOAT_EQ(result.x, 1.25f);
+    EXPECT_FLOAT_EQ(result.y, -3.75f);
+    EXPECT_FLOAT_EQ(result.z, 0.5f);
+}
+
+TEST(Vector3Cast, FloatToInt_Truncates)
+{
+    constexpr Vector3<float> v{3.9f, -2.1f, 7.7f};
+    constexpr auto result = static_cast<Vector3<int>>(v);
+    EXPECT_EQ(result.x, 3);
+    EXPECT_EQ(result.y, -2);
+    EXPECT_EQ(result.z, 7);
+}
+
+TEST(Vector3Cast, IntToFloat_Exact)
+{
+    constexpr Vector3<int> v{7, -4, 0};
+    constexpr auto result = static_cast<Vector3<float>>(v);
+    EXPECT_FLOAT_EQ(result.x, 7.f);
+    EXPECT_FLOAT_EQ(result.y, -4.f);
+    EXPECT_FLOAT_EQ(result.z, 0.f);
+}
+
+TEST(Vector3Cast, ZeroPreserved)
+{
+    constexpr Vector3<float> v{0.f, 0.f, 0.f};
+    constexpr auto result = static_cast<Vector3<double>>(v);
+    EXPECT_DOUBLE_EQ(result.x, 0.0);
+    EXPECT_DOUBLE_EQ(result.y, 0.0);
+    EXPECT_DOUBLE_EQ(result.z, 0.0);
+}
+
+TEST(Vector3Cast, NegativeValues)
+{
+    constexpr Vector3<double> v{-100.0, -200.0, -300.0};
+    constexpr auto result = static_cast<Vector3<float>>(v);
+    EXPECT_FLOAT_EQ(result.x, -100.f);
+    EXPECT_FLOAT_EQ(result.y, -200.f);
+    EXPECT_FLOAT_EQ(result.z, -300.f);
+}
+
+TEST(Vector3Cast, SameTypeRoundtrip)
+{
+    constexpr Vector3<float> v{1.f, 2.f, 3.f};
+    constexpr auto result = static_cast<Vector3<float>>(v);
+    EXPECT_FLOAT_EQ(result.x, v.x);
+    EXPECT_FLOAT_EQ(result.y, v.y);
+    EXPECT_FLOAT_EQ(result.z, v.z);
+}
+
+// Static assertions (compile-time checks)
+static_assert(Vector3(1.0f, 2.0f, 3.0f).length_sqr() == 14.0f, "LengthSqr should be 14");
+static_assert(Vector3(1.0f, 2.0f, 3.0f).dot(Vector3(4.0f, 5.0f, 6.0f)) == 32.0f, "Dot product should be 32");
+static_assert(Vector3(4.0f, 5.0f, 6.0f).distance_to_sqr(Vector3(1.0f, 2.0f, 3.0f)) == 27.0f, "DistToSqr should be 27");
+static_assert(Vector3(-1.0f, -2.0f, -3.0f).abs() == Vector3(1.0f, 2.0f, 3.0f), "Abs should convert negative values to positive");
