@@ -6,7 +6,7 @@ android {
     namespace = "com.android.support"
 
     compileSdk = 37
-    ndkVersion = "30.0.14904198"
+    
     defaultConfig {
         applicationId = "com.android.support"
         minSdk = 30
